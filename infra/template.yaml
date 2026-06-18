@@ -286,6 +286,288 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
+  # =========================================================================
+  # Static hosting — ACM, S3, CloudFront, Route 53
+  # =========================================================================
+
+  # -------------------------------------------------------------------------
+  # ACM certificate (us-east-1, required by CloudFront)
+  #
+  # Single certificate covering:
+  #   - <DomainName>                       (UI)
+  #   - <ImagesSubdomain>.<DomainName>     (images CDN)
+  #
+  # DNS-validated automatically via the provided Route 53 hosted zone.
+  # -------------------------------------------------------------------------
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      SubjectAlternativeNames:
+        - !Sub ${ImagesSubdomain}.${DomainName}
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: !Sub ${ImagesSubdomain}.${DomainName}
+          HostedZoneId: !Ref HostedZoneId
+      Tags:
+        - Key: Project
+          Value: SalesCatalog
+        - Key: Environment
+          Value: !Ref Environment
+
+  # -------------------------------------------------------------------------
+  # S3 bucket — React UI static assets
+  #
+  # Private: all public access blocked. Served exclusively through the UI
+  # CloudFront distribution using Origin Access Control (OAC).
+  # -------------------------------------------------------------------------
+  UiBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub salescatalog-${Environment}-ui-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Project
+          Value: SalesCatalog
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Bucket policy: allow read-only access from the UI CloudFront distribution
+  # (matched by AWS:SourceArn on the OAC-signed request).
+  UiBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref UiBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontServicePrincipalReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${UiBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${UiDistribution}
+
+  # -------------------------------------------------------------------------
+  # S3 bucket — product images
+  #
+  # Private bucket, served read-only via the Images CloudFront distribution.
+  # CORS allows the browser to upload directly via presigned PUT URLs.
+  # -------------------------------------------------------------------------
+  ImagesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub salescatalog-${Environment}-images-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      CorsConfiguration:
+        CorsRules:
+          - AllowedMethods:
+              - PUT
+              - GET
+              - HEAD
+            AllowedOrigins:
+              - !Sub https://${DomainName}
+              - http://localhost:5173
+            AllowedHeaders:
+              - "*"
+            ExposedHeaders:
+              - ETag
+            MaxAge: 3000
+      Tags:
+        - Key: Project
+          Value: SalesCatalog
+        - Key: Environment
+          Value: !Ref Environment
+
+  ImagesBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ImagesBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontServicePrincipalReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${ImagesBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${ImagesDistribution}
+
+  # -------------------------------------------------------------------------
+  # CloudFront Origin Access Controls (modern replacement for OAI)
+  # -------------------------------------------------------------------------
+  UiOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub salescatalog-${Environment}-ui-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  ImagesOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub salescatalog-${Environment}-images-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # -------------------------------------------------------------------------
+  # CloudFront distribution — UI (React SPA)
+  #
+  # SPA support: 403/404 from S3 are remapped to /index.html with HTTP 200
+  # so client-side routing (react-router) works on deep links and refreshes.
+  # -------------------------------------------------------------------------
+  UiDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub SalesCatalog ${Environment} UI
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_100      # cheapest: NA + EU edge locations only
+        Aliases:
+          - !Ref DomainName
+        ViewerCertificate:
+          AcmCertificateArn: !Ref Certificate
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+        DefaultRootObject: index.html
+        Origins:
+          - Id: ui-s3-origin
+            DomainName: !GetAtt UiBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ""   # required to be empty when using OAC
+            OriginAccessControlId: !GetAtt UiOriginAccessControl.Id
+        DefaultCacheBehavior:
+          TargetOriginId: ui-s3-origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          # AWS-managed cache policy: CachingOptimized
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 10
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 10
+      Tags:
+        - Key: Project
+          Value: SalesCatalog
+        - Key: Environment
+          Value: !Ref Environment
+
+  # -------------------------------------------------------------------------
+  # CloudFront distribution — product images
+  # -------------------------------------------------------------------------
+  ImagesDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub SalesCatalog ${Environment} product images
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+        Aliases:
+          - !Sub ${ImagesSubdomain}.${DomainName}
+        ViewerCertificate:
+          AcmCertificateArn: !Ref Certificate
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+        Origins:
+          - Id: images-s3-origin
+            DomainName: !GetAtt ImagesBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+            OriginAccessControlId: !GetAtt ImagesOriginAccessControl.Id
+        DefaultCacheBehavior:
+          TargetOriginId: images-s3-origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6   # CachingOptimized
+      Tags:
+        - Key: Project
+          Value: SalesCatalog
+        - Key: Environment
+          Value: !Ref Environment
+
+  # -------------------------------------------------------------------------
+  # Route 53 — alias records for the two CloudFront distributions.
+  #
+  # Z2FDTNDATAQYW2 is CloudFront's global hosted-zone id (constant, AWS-wide).
+  # -------------------------------------------------------------------------
+  UiDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub ${DomainName}.
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt UiDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  ImagesDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub ${ImagesSubdomain}.${DomainName}.
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ImagesDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
 # ---------------------------------------------------------------------------
 # Outputs
 # ---------------------------------------------------------------------------
@@ -338,3 +620,39 @@ Outputs:
     Value: !GetAtt CategoriesTable.Arn
     Export:
       Name: !Sub ${AWS::StackName}-CategoriesTableArn
+
+  UiBucketName:
+    Description: Name of the S3 bucket hosting the React UI build.
+    Value: !Ref UiBucket
+    Export:
+      Name: !Sub ${AWS::StackName}-UiBucketName
+
+  ImagesBucketName:
+    Description: Name of the S3 bucket holding product images.
+    Value: !Ref ImagesBucket
+    Export:
+      Name: !Sub ${AWS::StackName}-ImagesBucketName
+
+  UiDistributionId:
+    Description: CloudFront distribution ID for the UI (use for cache invalidation).
+    Value: !Ref UiDistribution
+    Export:
+      Name: !Sub ${AWS::StackName}-UiDistributionId
+
+  ImagesDistributionId:
+    Description: CloudFront distribution ID for product images.
+    Value: !Ref ImagesDistribution
+    Export:
+      Name: !Sub ${AWS::StackName}-ImagesDistributionId
+
+  UiUrl:
+    Description: Public URL of the UI.
+    Value: !Sub https://${DomainName}
+    Export:
+      Name: !Sub ${AWS::StackName}-UiUrl
+
+  ImagesBaseUrl:
+    Description: Public base URL of the product images CDN.
+    Value: !Sub https://${ImagesSubdomain}.${DomainName}
+    Export:
+      Name: !Sub ${AWS::StackName}-ImagesBaseUrl
