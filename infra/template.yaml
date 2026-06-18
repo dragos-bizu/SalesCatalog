@@ -213,6 +213,79 @@ Resources:
         IdToken: minutes
         RefreshToken: days
 
+  # -------------------------------------------------------------------------
+  # DynamoDB — Products table
+  #
+  # Access patterns:
+  #   - GetItem  by id                                  (PK lookup)
+  #   - Query    by categoryId, sorted by createdAt     (GSI "byCategory")
+  #   - Scan     with contains(nameLower, q)            (search by name)
+  #
+  # Search is intentionally implemented as a Scan + contains() filter.
+  # At the expected traffic (~10–20 users/day) this is cheap, simple and
+  # avoids the cost of OpenSearch. See docs/ for the rationale.
+  #
+  # Billing mode PAY_PER_REQUEST: no capacity to provision, no idle cost,
+  # generous always-free tier on small workloads.
+  # -------------------------------------------------------------------------
+  ProductsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub salescatalog-${Environment}-products
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: categoryId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: byCategory
+          KeySchema:
+            - AttributeName: categoryId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Project
+          Value: SalesCatalog
+        - Key: Environment
+          Value: !Ref Environment
+
+  # -------------------------------------------------------------------------
+  # DynamoDB — Categories table
+  #
+  # Access patterns:
+  #   - GetItem  by id                  (PK lookup)
+  #   - Scan     full list              (cheap: small table, low traffic)
+  # -------------------------------------------------------------------------
+  CategoriesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub salescatalog-${Environment}-categories
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Project
+          Value: SalesCatalog
+        - Key: Environment
+          Value: !Ref Environment
+
 # ---------------------------------------------------------------------------
 # Outputs
 # ---------------------------------------------------------------------------
@@ -241,3 +314,27 @@ Outputs:
     Value: !Sub https://${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com
     Export:
       Name: !Sub ${AWS::StackName}-HostedUiBaseUrl
+
+  ProductsTableName:
+    Description: Name of the DynamoDB Products table.
+    Value: !Ref ProductsTable
+    Export:
+      Name: !Sub ${AWS::StackName}-ProductsTableName
+
+  ProductsTableArn:
+    Description: ARN of the DynamoDB Products table.
+    Value: !GetAtt ProductsTable.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-ProductsTableArn
+
+  CategoriesTableName:
+    Description: Name of the DynamoDB Categories table.
+    Value: !Ref CategoriesTable
+    Export:
+      Name: !Sub ${AWS::StackName}-CategoriesTableName
+
+  CategoriesTableArn:
+    Description: ARN of the DynamoDB Categories table.
+    Value: !GetAtt CategoriesTable.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-CategoriesTableArn
