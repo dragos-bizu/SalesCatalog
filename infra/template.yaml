@@ -568,6 +568,326 @@ Resources:
         HostedZoneId: Z2FDTNDATAQYW2
         EvaluateTargetHealth: false
 
+  # =========================================================================
+  # API — Lambda Layer, HTTP API, Lambda functions
+  # =========================================================================
+
+  # -------------------------------------------------------------------------
+  # Shared Lambda Layer
+  #
+  # Packages src/shared/python/ so handlers can `from salescatalog_shared
+  # import db, auth`. Built from src/shared/ where SAM's BuildMethod
+  # convention expects a `python/` sub-directory.
+  # -------------------------------------------------------------------------
+  SharedLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub salescatalog-${Environment}-shared
+      Description: SalesCatalog shared helpers (db, auth) for Lambda handlers.
+      ContentUri: ../src/shared/
+      CompatibleRuntimes:
+        - python3.12
+      CompatibleArchitectures:
+        - arm64
+      RetentionPolicy: Delete
+    Metadata:
+      BuildMethod: python3.12
+      BuildArchitecture: arm64
+
+  # -------------------------------------------------------------------------
+  # HTTP API (API Gateway v2)
+  #
+  # Cheaper and simpler than REST APIs. JWT authorizer is wired to the
+  # Cognito User Pool; admin routes attach it explicitly, public routes
+  # leave it off (DefaultAuthorizer is intentionally not set).
+  # -------------------------------------------------------------------------
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Environment
+      CorsConfiguration:
+        AllowOrigins:
+          - !Sub https://${DomainName}
+          - http://localhost:5173
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        MaxAge: 600
+      Auth:
+        Authorizers:
+          CognitoJwtAuthorizer:
+            IdentitySource: "$request.header.Authorization"
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}
+              audience:
+                - !Ref UserPoolClient
+
+  # -------------------------------------------------------------------------
+  # Lambda functions
+  #
+  # Conventions for every function below:
+  #   - CodeUri    : src/lambdas/<name>/
+  #   - Handler    : handler.lambda_handler
+  #   - Layer      : SharedLayer
+  #   - Env vars   : table / bucket names as needed
+  #   - Policies   : minimal, explicit per function (no wildcards)
+  # -------------------------------------------------------------------------
+
+  # ----- Public: products ---------------------------------------------------
+
+  GetProductsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-getProducts
+      CodeUri: ../src/lambdas/getProducts/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          PRODUCTS_TABLE: !Ref ProductsTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ProductsTable
+      Events:
+        ListProducts:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /products
+
+  GetProductFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-getProduct
+      CodeUri: ../src/lambdas/getProduct/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          PRODUCTS_TABLE: !Ref ProductsTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ProductsTable
+      Events:
+        GetProduct:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /products/{id}
+
+  # ----- Admin: products ----------------------------------------------------
+
+  CreateProductFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-createProduct
+      CodeUri: ../src/lambdas/createProduct/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          PRODUCTS_TABLE: !Ref ProductsTable
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref ProductsTable
+      Events:
+        CreateProduct:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /products
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+
+  UpdateProductFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-updateProduct
+      CodeUri: ../src/lambdas/updateProduct/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          PRODUCTS_TABLE: !Ref ProductsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ProductsTable
+      Events:
+        UpdateProduct:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: PUT
+            Path: /products/{id}
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+
+  DeleteProductFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-deleteProduct
+      CodeUri: ../src/lambdas/deleteProduct/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          PRODUCTS_TABLE: !Ref ProductsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ProductsTable
+      Events:
+        DeleteProduct:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: DELETE
+            Path: /products/{id}
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+
+  # ----- Admin: image uploads ----------------------------------------------
+
+  CreateImageUploadUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-createImageUploadUrl
+      CodeUri: ../src/lambdas/createImageUploadUrl/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          IMAGES_BUCKET: !Ref ImagesBucket
+          IMAGES_BASE_URL: !Sub https://${ImagesSubdomain}.${DomainName}
+      Policies:
+        # Scope is intentionally limited to s3:PutObject on the images bucket.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub ${ImagesBucket.Arn}/*
+      Events:
+        CreateImageUploadUrl:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /admin/images/upload-url
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+
+  # ----- Public: categories -------------------------------------------------
+
+  ListCategoriesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-listCategories
+      CodeUri: ../src/lambdas/listCategories/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          CATEGORIES_TABLE: !Ref CategoriesTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref CategoriesTable
+      Events:
+        ListCategories:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /categories
+
+  # ----- Admin: categories --------------------------------------------------
+
+  CreateCategoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-createCategory
+      CodeUri: ../src/lambdas/createCategory/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          CATEGORIES_TABLE: !Ref CategoriesTable
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref CategoriesTable
+      Events:
+        CreateCategory:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /categories
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+
+  UpdateCategoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-updateCategory
+      CodeUri: ../src/lambdas/updateCategory/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          CATEGORIES_TABLE: !Ref CategoriesTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CategoriesTable
+      Events:
+        UpdateCategory:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: PUT
+            Path: /categories/{id}
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+
+  DeleteCategoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-deleteCategory
+      CodeUri: ../src/lambdas/deleteCategory/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          CATEGORIES_TABLE: !Ref CategoriesTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CategoriesTable
+      Events:
+        DeleteCategory:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: DELETE
+            Path: /categories/{id}
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+
 # ---------------------------------------------------------------------------
 # Outputs
 # ---------------------------------------------------------------------------
@@ -656,3 +976,15 @@ Outputs:
     Value: !Sub https://${ImagesSubdomain}.${DomainName}
     Export:
       Name: !Sub ${AWS::StackName}-ImagesBaseUrl
+
+  ApiBaseUrl:
+    Description: Base URL of the HTTP API.
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}
+    Export:
+      Name: !Sub ${AWS::StackName}-ApiBaseUrl
+
+  SharedLayerArn:
+    Description: ARN of the shared helpers Lambda layer.
+    Value: !Ref SharedLayer
+    Export:
+      Name: !Sub ${AWS::StackName}-SharedLayerArn
