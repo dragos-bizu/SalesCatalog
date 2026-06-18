@@ -1,0 +1,9 @@
+- Catalog like app: 
+    - Admin to add, update or remove products
+    - Product display for all users (not login required)
+    - Products list with pagination
+    - Categories for products
+    - Search product by name
+- Mobile is mandatory
+- WebApp, but including mobile so it can be use like a native app
+- Traffic will be low, 1 admin and 10-20 users per day
