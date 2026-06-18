@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Description: >
+  SalesCatalog — serverless product catalog.
+  Cognito (admin-only, Google federation) + API Gateway HTTP API + Lambda (Python 3.12) +
+  DynamoDB (Products, Categories) + S3 (UI, Images) + CloudFront + Route 53.
+  Region: us-east-1.
+
+# ---------------------------------------------------------------------------
+# Parameters
+# ---------------------------------------------------------------------------
+Parameters:
+
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+    Description: Deployment environment tag. Used in resource names and tags.
+
+  DomainName:
+    Type: String
+    Description: >
+      Public domain for the UI (e.g. "catalog.example.com").
+      A Route 53 hosted zone for the parent domain must already exist.
+
+  ImagesSubdomain:
+    Type: String
+    Default: images
+    Description: >
+      Subdomain (label only, no dots) used for the product images CloudFront
+      distribution. Combined with DomainName as "<ImagesSubdomain>.<DomainName>".
+
+  HostedZoneId:
+    Type: AWS::Route53::HostedZone::Id
+    Description: Existing Route 53 Hosted Zone ID where DNS records will be created.
+
+  GoogleClientId:
+    Type: String
+    Description: Google OAuth 2.0 Client ID used for Cognito federation.
+
+  GoogleClientSecret:
+    Type: String
+    NoEcho: true
+    Description: Google OAuth 2.0 Client Secret used for Cognito federation.
+
+# ---------------------------------------------------------------------------
+# Globals — defaults applied to every SAM resource of the given type.
+# ---------------------------------------------------------------------------
+Globals:
+
+  Function:
+    Runtime: python3.12
+    Architectures:
+      - arm64                       # cheaper than x86_64 on Lambda
+    Timeout: 10                     # seconds; raise per-function if needed
+    MemorySize: 256                 # MB; baseline for small Python handlers
+    Tracing: Active                 # enable X-Ray
+    Environment:
+      Variables:
+        ENVIRONMENT: !Ref Environment
+        POWERTOOLS_SERVICE_NAME: salescatalog
+        LOG_LEVEL: INFO
+    Tags:
+      Project: SalesCatalog
+      Environment: !Ref Environment
+
+# ---------------------------------------------------------------------------
+# Resources
+# Real resources are added in subsequent steps (3b–3e).
+# ---------------------------------------------------------------------------
+Resources: {}
+
+# ---------------------------------------------------------------------------
+# Outputs
+# Populated in subsequent steps as resources are added.
+# ---------------------------------------------------------------------------
+Outputs: {}
