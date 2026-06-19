@@ -1,0 +1,1179 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+Description: >
+  SalesCatalog — serverless product catalog.
+  Cognito (admin-only, Google federation) + API Gateway HTTP API + Lambda (Python 3.12) +
+  DynamoDB (Products, Categories) + S3 (UI, Images) + CloudFront + Route 53.
+  Region: us-east-1.
+
+# ---------------------------------------------------------------------------
+# Parameters
+# ---------------------------------------------------------------------------
+Parameters:
+
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+    Description: Deployment environment tag. Used in resource names and tags.
+
+  DomainName:
+    Type: String
+    Description: >
+      Public domain for the UI (e.g. "catalog.example.com").
+      A Route 53 hosted zone for the parent domain must already exist.
+
+  ImagesSubdomain:
+    Type: String
+    Default: images
+    Description: >
+      Subdomain (label only, no dots) used for the product images CloudFront
+      distribution. Combined with DomainName as "<ImagesSubdomain>.<DomainName>".
+
+  HostedZoneId:
+    Type: AWS::Route53::HostedZone::Id
+    Description: Existing Route 53 Hosted Zone ID where DNS records will be created.
+
+  GoogleClientId:
+    Type: String
+    Description: Google OAuth 2.0 Client ID used for Cognito federation.
+
+  GoogleClientSecret:
+    Type: String
+    NoEcho: true
+    Description: Google OAuth 2.0 Client Secret used for Cognito federation.
+
+  AccessTokenValidityMinutes:
+    Type: Number
+    Default: 60
+    MinValue: 5
+    MaxValue: 1440
+    Description: Lifetime of Cognito access tokens, in minutes (5–1440).
+
+  IdTokenValidityMinutes:
+    Type: Number
+    Default: 60
+    MinValue: 5
+    MaxValue: 1440
+    Description: Lifetime of Cognito ID tokens, in minutes (5–1440).
+
+  RefreshTokenValidityDays:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    MaxValue: 3650
+    Description: Lifetime of Cognito refresh tokens, in days (1–3650).
+
+  BudgetMonthlyLimitUSD:
+    Type: Number
+    Default: 10
+    MinValue: 1
+    Description: Monthly cost budget in USD; alert thresholds are computed from this.
+
+  BudgetNotificationEmail:
+    Type: String
+    Description: Email address that receives cost budget alerts.
+
+# ---------------------------------------------------------------------------
+# Globals — defaults applied to every SAM resource of the given type.
+# ---------------------------------------------------------------------------
+Globals:
+
+  Function:
+    Runtime: python3.12
+    Architectures:
+      - arm64                       # cheaper than x86_64 on Lambda
+    Timeout: 10                     # seconds; raise per-function if needed
+    MemorySize: 256                 # MB; baseline for small Python handlers
+    Tracing: Active                 # enable X-Ray
+    Environment:
+      Variables:
+        ENVIRONMENT: !Ref Environment
+        POWERTOOLS_SERVICE_NAME: salescatalog
+        LOG_LEVEL: INFO
+    Tags:
+      Project: SalesCatalog
+      Environment: !Ref Environment
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+Resources:
+
+  # -------------------------------------------------------------------------
+  # Cognito User Pool
+  #
+  # Admin-only: self sign-up is disabled. Admins are created by an existing
+  # admin (AdminCreateUser) or arrive via the Google identity provider. Any
+  # user that successfully signs in is considered an admin by definition.
+  # -------------------------------------------------------------------------
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub salescatalog-${Environment}-admins
+      # Block self sign-up. Only administrators can create new admin users.
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      # Sign-in uses email as the username.
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      MfaConfiguration: "OFF"
+      # Standard attributes we want available on every admin profile.
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+        - Name: name
+          AttributeDataType: String
+          Required: false
+          Mutable: true
+      DeletionProtection: ACTIVE
+      UserPoolTags:
+        Project: SalesCatalog
+        Environment: !Ref Environment
+
+  # -------------------------------------------------------------------------
+  # Cognito User Pool Domain (Hosted UI)
+  #
+  # Cognito-hosted login page used by the React app. The domain prefix is
+  # made unique per-account/region by appending the AWS account id.
+  # -------------------------------------------------------------------------
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      UserPoolId: !Ref UserPool
+      Domain: !Sub salescatalog-${Environment}-${AWS::AccountId}
+
+  # -------------------------------------------------------------------------
+  # Google Identity Provider
+  #
+  # Federates Google sign-in into the User Pool. The attribute mapping
+  # copies the Google profile email/name into the corresponding Cognito
+  # attributes on first login.
+  # -------------------------------------------------------------------------
+  GoogleIdentityProvider:
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    Properties:
+      UserPoolId: !Ref UserPool
+      ProviderName: Google
+      ProviderType: Google
+      ProviderDetails:
+        client_id: !Ref GoogleClientId
+        client_secret: !Ref GoogleClientSecret
+        authorize_scopes: "openid email profile"
+      AttributeMapping:
+        email: email
+        name: name
+
+  # -------------------------------------------------------------------------
+  # Cognito App Client used by the React UI.
+  #
+  # - Public SPA client (no client secret).
+  # - Authorization Code flow + PKCE via the Hosted UI.
+  # - Supports Cognito-native logins AND the Google IdP.
+  # - Callback / logout URLs use the configured UI domain.
+  # -------------------------------------------------------------------------
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    # DependsOn ensures the Google IdP exists before the client references it.
+    DependsOn: GoogleIdentityProvider
+    Properties:
+      ClientName: !Sub salescatalog-${Environment}-web
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      SupportedIdentityProviders:
+        - COGNITO
+        - Google
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthScopes:
+        - openid
+        - email
+        - profile
+      CallbackURLs:
+        - !Sub https://${DomainName}/auth/callback
+        - http://localhost:5173/auth/callback   # local Vite dev server
+      LogoutURLs:
+        - !Sub https://${DomainName}/
+        - http://localhost:5173/
+      ExplicitAuthFlows:
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      AccessTokenValidity: !Ref AccessTokenValidityMinutes
+      IdTokenValidity: !Ref IdTokenValidityMinutes
+      RefreshTokenValidity: !Ref RefreshTokenValidityDays
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+
+  # -------------------------------------------------------------------------
+  # DynamoDB — Products table
+  #
+  # Access patterns:
+  #   - GetItem  by id                                  (PK lookup)
+  #   - Query    by categoryId, sorted by createdAt     (GSI "byCategory")
+  #   - Scan     with contains(nameLower, q)            (search by name)
+  #
+  # Search is intentionally implemented as a Scan + contains() filter.
+  # At the expected traffic (~10–20 users/day) this is cheap, simple and
+  # avoids the cost of OpenSearch. See docs/ for the rationale.
+  #
+  # Billing mode PAY_PER_REQUEST: no capacity to provision, no idle cost,
+  # generous always-free tier on small workloads.
+  # -------------------------------------------------------------------------
+  ProductsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub salescatalog-${Environment}-products
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: categoryId
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: byCategory
+          KeySchema:
+            - AttributeName: categoryId
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Project
+          Value: SalesCatalog
+        - Key: Environment
+          Value: !Ref Environment
+
+  # -------------------------------------------------------------------------
+  # DynamoDB — Categories table
+  #
+  # Access patterns:
+  #   - GetItem  by id                  (PK lookup)
+  #   - Scan     full list              (cheap: small table, low traffic)
+  # -------------------------------------------------------------------------
+  CategoriesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub salescatalog-${Environment}-categories
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Project
+          Value: SalesCatalog
+        - Key: Environment
+          Value: !Ref Environment
+
+  # =========================================================================
+  # Static hosting — ACM, S3, CloudFront, Route 53
+  # =========================================================================
+
+  # -------------------------------------------------------------------------
+  # ACM certificate (us-east-1, required by CloudFront)
+  #
+  # Single certificate covering:
+  #   - <DomainName>                       (UI)
+  #   - <ImagesSubdomain>.<DomainName>     (images CDN)
+  #
+  # DNS-validated automatically via the provided Route 53 hosted zone.
+  # -------------------------------------------------------------------------
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      SubjectAlternativeNames:
+        - !Sub ${ImagesSubdomain}.${DomainName}
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !Ref HostedZoneId
+        - DomainName: !Sub ${ImagesSubdomain}.${DomainName}
+          HostedZoneId: !Ref HostedZoneId
+      Tags:
+        - Key: Project
+          Value: SalesCatalog
+        - Key: Environment
+          Value: !Ref Environment
+
+  # -------------------------------------------------------------------------
+  # S3 bucket — React UI static assets
+  #
+  # Private: all public access blocked. Served exclusively through the UI
+  # CloudFront distribution using Origin Access Control (OAC).
+  # -------------------------------------------------------------------------
+  UiBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub salescatalog-${Environment}-ui-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Project
+          Value: SalesCatalog
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Bucket policy: allow read-only access from the UI CloudFront distribution
+  # (matched by AWS:SourceArn on the OAC-signed request).
+  UiBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref UiBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontServicePrincipalReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${UiBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${UiDistribution}
+
+  # -------------------------------------------------------------------------
+  # S3 bucket — product images
+  #
+  # Private bucket, served read-only via the Images CloudFront distribution.
+  # CORS allows the browser to upload directly via presigned PUT URLs.
+  # -------------------------------------------------------------------------
+  ImagesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub salescatalog-${Environment}-images-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      CorsConfiguration:
+        CorsRules:
+          - AllowedMethods:
+              - PUT
+              - GET
+              - HEAD
+            AllowedOrigins:
+              - !Sub https://${DomainName}
+              - http://localhost:5173
+            AllowedHeaders:
+              - "*"
+            ExposedHeaders:
+              - ETag
+            MaxAge: 3000
+      Tags:
+        - Key: Project
+          Value: SalesCatalog
+        - Key: Environment
+          Value: !Ref Environment
+
+  ImagesBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ImagesBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowCloudFrontServicePrincipalReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${ImagesBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${ImagesDistribution}
+
+  # -------------------------------------------------------------------------
+  # CloudFront Origin Access Controls (modern replacement for OAI)
+  # -------------------------------------------------------------------------
+  UiOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub salescatalog-${Environment}-ui-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  ImagesOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub salescatalog-${Environment}-images-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # -------------------------------------------------------------------------
+  # CloudFront distribution — UI (React SPA)
+  #
+  # SPA support: 403/404 from S3 are remapped to /index.html with HTTP 200
+  # so client-side routing (react-router) works on deep links and refreshes.
+  # -------------------------------------------------------------------------
+  UiDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub SalesCatalog ${Environment} UI
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_100      # cheapest: NA + EU edge locations only
+        Aliases:
+          - !Ref DomainName
+        ViewerCertificate:
+          AcmCertificateArn: !Ref Certificate
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+        DefaultRootObject: index.html
+        Origins:
+          - Id: ui-s3-origin
+            DomainName: !GetAtt UiBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ""   # required to be empty when using OAC
+            OriginAccessControlId: !GetAtt UiOriginAccessControl.Id
+        DefaultCacheBehavior:
+          TargetOriginId: ui-s3-origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          # AWS-managed cache policy: CachingOptimized
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 10
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 10
+      Tags:
+        - Key: Project
+          Value: SalesCatalog
+        - Key: Environment
+          Value: !Ref Environment
+
+  # -------------------------------------------------------------------------
+  # CloudFront distribution — product images
+  # -------------------------------------------------------------------------
+  ImagesDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub SalesCatalog ${Environment} product images
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+        Aliases:
+          - !Sub ${ImagesSubdomain}.${DomainName}
+        ViewerCertificate:
+          AcmCertificateArn: !Ref Certificate
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+        Origins:
+          - Id: images-s3-origin
+            DomainName: !GetAtt ImagesBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ""
+            OriginAccessControlId: !GetAtt ImagesOriginAccessControl.Id
+        DefaultCacheBehavior:
+          TargetOriginId: images-s3-origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6   # CachingOptimized
+      Tags:
+        - Key: Project
+          Value: SalesCatalog
+        - Key: Environment
+          Value: !Ref Environment
+
+  # -------------------------------------------------------------------------
+  # Route 53 — alias records for the two CloudFront distributions.
+  #
+  # Z2FDTNDATAQYW2 is CloudFront's global hosted-zone id (constant, AWS-wide).
+  # -------------------------------------------------------------------------
+  UiDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub ${DomainName}.
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt UiDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  ImagesDnsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Sub ${ImagesSubdomain}.${DomainName}.
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ImagesDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  # =========================================================================
+  # API — Lambda Layer, HTTP API, Lambda functions
+  # =========================================================================
+
+  # -------------------------------------------------------------------------
+  # Shared Lambda Layer
+  #
+  # Packages src/shared/python/ so handlers can `from salescatalog_shared
+  # import db, auth`. Built from src/shared/ where SAM's BuildMethod
+  # convention expects a `python/` sub-directory.
+  # -------------------------------------------------------------------------
+  SharedLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: !Sub salescatalog-${Environment}-shared
+      Description: SalesCatalog shared helpers (db, auth) for Lambda handlers.
+      ContentUri: ../src/shared/
+      CompatibleRuntimes:
+        - python3.12
+      CompatibleArchitectures:
+        - arm64
+      RetentionPolicy: Delete
+    Metadata:
+      BuildMethod: python3.12
+      BuildArchitecture: arm64
+
+  # -------------------------------------------------------------------------
+  # HTTP API (API Gateway v2)
+  #
+  # Cheaper and simpler than REST APIs. JWT authorizer is wired to the
+  # Cognito User Pool; admin routes attach it explicitly, public routes
+  # leave it off (DefaultAuthorizer is intentionally not set).
+  # -------------------------------------------------------------------------
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref Environment
+      CorsConfiguration:
+        AllowOrigins:
+          - !Sub https://${DomainName}
+          - http://localhost:5173
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        MaxAge: 600
+      Auth:
+        Authorizers:
+          CognitoJwtAuthorizer:
+            IdentitySource: "$request.header.Authorization"
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}
+              audience:
+                - !Ref UserPoolClient
+
+  # -------------------------------------------------------------------------
+  # Lambda functions
+  #
+  # Conventions for every function below:
+  #   - CodeUri    : src/lambdas/<name>/
+  #   - Handler    : handler.lambda_handler
+  #   - Layer      : SharedLayer
+  #   - Env vars   : table / bucket names as needed
+  #   - Policies   : minimal, explicit per function (no wildcards)
+  # -------------------------------------------------------------------------
+
+  # ----- Public: products ---------------------------------------------------
+
+  GetProductsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-getProducts
+      CodeUri: ../src/lambdas/getProducts/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          PRODUCTS_TABLE: !Ref ProductsTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ProductsTable
+      Events:
+        ListProducts:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /products
+
+  GetProductFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-getProduct
+      CodeUri: ../src/lambdas/getProduct/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          PRODUCTS_TABLE: !Ref ProductsTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref ProductsTable
+      Events:
+        GetProduct:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /products/{id}
+
+  # ----- Admin: products ----------------------------------------------------
+
+  CreateProductFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-createProduct
+      CodeUri: ../src/lambdas/createProduct/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          PRODUCTS_TABLE: !Ref ProductsTable
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref ProductsTable
+      Events:
+        CreateProduct:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /products
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+
+  UpdateProductFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-updateProduct
+      CodeUri: ../src/lambdas/updateProduct/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          PRODUCTS_TABLE: !Ref ProductsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ProductsTable
+      Events:
+        UpdateProduct:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: PUT
+            Path: /products/{id}
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+
+  DeleteProductFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-deleteProduct
+      CodeUri: ../src/lambdas/deleteProduct/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          PRODUCTS_TABLE: !Ref ProductsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ProductsTable
+      Events:
+        DeleteProduct:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: DELETE
+            Path: /products/{id}
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+
+  # ----- Admin: image uploads ----------------------------------------------
+
+  CreateImageUploadUrlFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-createImageUploadUrl
+      CodeUri: ../src/lambdas/createImageUploadUrl/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          IMAGES_BUCKET: !Ref ImagesBucket
+          IMAGES_BASE_URL: !Sub https://${ImagesSubdomain}.${DomainName}
+      Policies:
+        # Scope is intentionally limited to s3:PutObject on the images bucket.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub ${ImagesBucket.Arn}/*
+      Events:
+        CreateImageUploadUrl:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /admin/images/upload-url
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+
+  # ----- Public: categories -------------------------------------------------
+
+  ListCategoriesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-listCategories
+      CodeUri: ../src/lambdas/listCategories/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          CATEGORIES_TABLE: !Ref CategoriesTable
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref CategoriesTable
+      Events:
+        ListCategories:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /categories
+
+  # ----- Admin: categories --------------------------------------------------
+
+  CreateCategoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-createCategory
+      CodeUri: ../src/lambdas/createCategory/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          CATEGORIES_TABLE: !Ref CategoriesTable
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref CategoriesTable
+      Events:
+        CreateCategory:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /categories
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+
+  UpdateCategoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-updateCategory
+      CodeUri: ../src/lambdas/updateCategory/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          CATEGORIES_TABLE: !Ref CategoriesTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CategoriesTable
+      Events:
+        UpdateCategory:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: PUT
+            Path: /categories/{id}
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+
+  DeleteCategoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-deleteCategory
+      CodeUri: ../src/lambdas/deleteCategory/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          CATEGORIES_TABLE: !Ref CategoriesTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CategoriesTable
+      Events:
+        DeleteCategory:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: DELETE
+            Path: /categories/{id}
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+
+  # =========================================================================
+  # Monitoring & cost control
+  # =========================================================================
+
+  # -------------------------------------------------------------------------
+  # CloudWatch log groups for each Lambda.
+  #
+  # Defined explicitly (rather than letting Lambda auto-create them) so we
+  # can pin RetentionInDays. Names follow the standard /aws/lambda/<fn-name>
+  # convention so they bind to the auto-created log streams.
+  # -------------------------------------------------------------------------
+  GetProductsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-getProducts
+      RetentionInDays: 1
+
+  GetProductLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-getProduct
+      RetentionInDays: 1
+
+  CreateProductLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-createProduct
+      RetentionInDays: 1
+
+  UpdateProductLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-updateProduct
+      RetentionInDays: 1
+
+  DeleteProductLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-deleteProduct
+      RetentionInDays: 1
+
+  CreateImageUploadUrlLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-createImageUploadUrl
+      RetentionInDays: 1
+
+  ListCategoriesLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-listCategories
+      RetentionInDays: 1
+
+  CreateCategoryLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-createCategory
+      RetentionInDays: 1
+
+  UpdateCategoryLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-updateCategory
+      RetentionInDays: 1
+
+  DeleteCategoryLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-deleteCategory
+      RetentionInDays: 1
+
+  # -------------------------------------------------------------------------
+  # AWS Budgets — monthly cost cap for the whole AWS account.
+  #
+  # Three notifications:
+  #   - ACTUAL    50%  warning
+  #   - ACTUAL    80%  warning
+  #   - FORECASTED 100% projection alert
+  #
+  # Notifications are sent by email to BudgetNotificationEmail.
+  # -------------------------------------------------------------------------
+  AccountMonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub salescatalog-${Environment}-monthly-account-budget
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: !Ref BudgetMonthlyLimitUSD
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 50
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetNotificationEmail
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetNotificationEmail
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetNotificationEmail
+
+  # -------------------------------------------------------------------------
+  # CloudWatch Dashboard
+  #
+  # Single dashboard (free tier: first 3 are free) visualising:
+  #   - API Gateway request count + 4xx + 5xx
+  #   - Lambda invocations (per function, stacked)
+  # -------------------------------------------------------------------------
+  MonitoringDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub salescatalog-${Environment}
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "title": "API Gateway — Requests / 4xx / 5xx",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "stacked": false,
+                "stat": "Sum",
+                "period": 300,
+                "metrics": [
+                  [ "AWS/ApiGateway", "Count",       "ApiId", "${HttpApi}", { "label": "Requests" } ],
+                  [ ".",              "4xx",         ".",     ".",          { "label": "4xx" } ],
+                  [ ".",              "5xx",         ".",     ".",          { "label": "5xx" } ]
+                ]
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 6, "width": 12, "height": 6,
+              "properties": {
+                "title": "Lambda Invocations (per function)",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "stacked": true,
+                "stat": "Sum",
+                "period": 300,
+                "metrics": [
+                  [ "AWS/Lambda", "Invocations", "FunctionName", "${GetProductsFunction}" ],
+                  [ ".",          ".",            ".",            "${GetProductFunction}" ],
+                  [ ".",          ".",            ".",            "${CreateProductFunction}" ],
+                  [ ".",          ".",            ".",            "${UpdateProductFunction}" ],
+                  [ ".",          ".",            ".",            "${DeleteProductFunction}" ],
+                  [ ".",          ".",            ".",            "${CreateImageUploadUrlFunction}" ],
+                  [ ".",          ".",            ".",            "${ListCategoriesFunction}" ],
+                  [ ".",          ".",            ".",            "${CreateCategoryFunction}" ],
+                  [ ".",          ".",            ".",            "${UpdateCategoryFunction}" ],
+                  [ ".",          ".",            ".",            "${DeleteCategoryFunction}" ]
+                ]
+              }
+            }
+          ]
+        }
+
+# ---------------------------------------------------------------------------
+# Outputs
+# ---------------------------------------------------------------------------
+Outputs:
+
+  UserPoolId:
+    Description: Cognito User Pool ID.
+    Value: !Ref UserPool
+    Export:
+      Name: !Sub ${AWS::StackName}-UserPoolId
+
+  UserPoolClientId:
+    Description: Cognito User Pool App Client ID used by the React UI.
+    Value: !Ref UserPoolClient
+    Export:
+      Name: !Sub ${AWS::StackName}-UserPoolClientId
+
+  UserPoolDomain:
+    Description: Cognito Hosted UI domain (prefix only).
+    Value: !Ref UserPoolDomain
+    Export:
+      Name: !Sub ${AWS::StackName}-UserPoolDomain
+
+  HostedUiBaseUrl:
+    Description: Full base URL of the Cognito Hosted UI.
+    Value: !Sub https://${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com
+    Export:
+      Name: !Sub ${AWS::StackName}-HostedUiBaseUrl
+
+  ProductsTableName:
+    Description: Name of the DynamoDB Products table.
+    Value: !Ref ProductsTable
+    Export:
+      Name: !Sub ${AWS::StackName}-ProductsTableName
+
+  ProductsTableArn:
+    Description: ARN of the DynamoDB Products table.
+    Value: !GetAtt ProductsTable.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-ProductsTableArn
+
+  CategoriesTableName:
+    Description: Name of the DynamoDB Categories table.
+    Value: !Ref CategoriesTable
+    Export:
+      Name: !Sub ${AWS::StackName}-CategoriesTableName
+
+  CategoriesTableArn:
+    Description: ARN of the DynamoDB Categories table.
+    Value: !GetAtt CategoriesTable.Arn
+    Export:
+      Name: !Sub ${AWS::StackName}-CategoriesTableArn
+
+  UiBucketName:
+    Description: Name of the S3 bucket hosting the React UI build.
+    Value: !Ref UiBucket
+    Export:
+      Name: !Sub ${AWS::StackName}-UiBucketName
+
+  ImagesBucketName:
+    Description: Name of the S3 bucket holding product images.
+    Value: !Ref ImagesBucket
+    Export:
+      Name: !Sub ${AWS::StackName}-ImagesBucketName
+
+  UiDistributionId:
+    Description: CloudFront distribution ID for the UI (use for cache invalidation).
+    Value: !Ref UiDistribution
+    Export:
+      Name: !Sub ${AWS::StackName}-UiDistributionId
+
+  ImagesDistributionId:
+    Description: CloudFront distribution ID for product images.
+    Value: !Ref ImagesDistribution
+    Export:
+      Name: !Sub ${AWS::StackName}-ImagesDistributionId
+
+  UiUrl:
+    Description: Public URL of the UI.
+    Value: !Sub https://${DomainName}
+    Export:
+      Name: !Sub ${AWS::StackName}-UiUrl
+
+  ImagesBaseUrl:
+    Description: Public base URL of the product images CDN.
+    Value: !Sub https://${ImagesSubdomain}.${DomainName}
+    Export:
+      Name: !Sub ${AWS::StackName}-ImagesBaseUrl
+
+  ApiBaseUrl:
+    Description: Base URL of the HTTP API.
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}
+    Export:
+      Name: !Sub ${AWS::StackName}-ApiBaseUrl
+
+  SharedLayerArn:
+    Description: ARN of the shared helpers Lambda layer.
+    Value: !Ref SharedLayer
+    Export:
+      Name: !Sub ${AWS::StackName}-SharedLayerArn
+
+  MonitoringDashboardUrl:
+    Description: Direct URL to the CloudWatch dashboard.
+    Value: !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${MonitoringDashboard}
