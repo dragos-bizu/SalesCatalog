@@ -67,6 +67,16 @@ Parameters:
     MaxValue: 3650
     Description: Lifetime of Cognito refresh tokens, in days (1–3650).
 
+  BudgetMonthlyLimitUSD:
+    Type: Number
+    Default: 10
+    MinValue: 1
+    Description: Monthly cost budget in USD; alert thresholds are computed from this.
+
+  BudgetNotificationEmail:
+    Type: String
+    Description: Email address that receives cost budget alerts.
+
 # ---------------------------------------------------------------------------
 # Globals — defaults applied to every SAM resource of the given type.
 # ---------------------------------------------------------------------------
@@ -888,6 +898,181 @@ Resources:
             Auth:
               Authorizer: CognitoJwtAuthorizer
 
+  # =========================================================================
+  # Monitoring & cost control
+  # =========================================================================
+
+  # -------------------------------------------------------------------------
+  # CloudWatch log groups for each Lambda.
+  #
+  # Defined explicitly (rather than letting Lambda auto-create them) so we
+  # can pin RetentionInDays. Names follow the standard /aws/lambda/<fn-name>
+  # convention so they bind to the auto-created log streams.
+  # -------------------------------------------------------------------------
+  GetProductsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-getProducts
+      RetentionInDays: 1
+
+  GetProductLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-getProduct
+      RetentionInDays: 1
+
+  CreateProductLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-createProduct
+      RetentionInDays: 1
+
+  UpdateProductLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-updateProduct
+      RetentionInDays: 1
+
+  DeleteProductLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-deleteProduct
+      RetentionInDays: 1
+
+  CreateImageUploadUrlLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-createImageUploadUrl
+      RetentionInDays: 1
+
+  ListCategoriesLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-listCategories
+      RetentionInDays: 1
+
+  CreateCategoryLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-createCategory
+      RetentionInDays: 1
+
+  UpdateCategoryLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-updateCategory
+      RetentionInDays: 1
+
+  DeleteCategoryLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-deleteCategory
+      RetentionInDays: 1
+
+  # -------------------------------------------------------------------------
+  # AWS Budgets — monthly cost cap for the whole AWS account.
+  #
+  # Three notifications:
+  #   - ACTUAL    50%  warning
+  #   - ACTUAL    80%  warning
+  #   - FORECASTED 100% projection alert
+  #
+  # Notifications are sent by email to BudgetNotificationEmail.
+  # -------------------------------------------------------------------------
+  AccountMonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub salescatalog-${Environment}-monthly-account-budget
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: !Ref BudgetMonthlyLimitUSD
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 50
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetNotificationEmail
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetNotificationEmail
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetNotificationEmail
+
+  # -------------------------------------------------------------------------
+  # CloudWatch Dashboard
+  #
+  # Single dashboard (free tier: first 3 are free) visualising:
+  #   - API Gateway request count + 4xx + 5xx
+  #   - Lambda invocations (per function, stacked)
+  # -------------------------------------------------------------------------
+  MonitoringDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub salescatalog-${Environment}
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0, "y": 0, "width": 12, "height": 6,
+              "properties": {
+                "title": "API Gateway — Requests / 4xx / 5xx",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "stacked": false,
+                "stat": "Sum",
+                "period": 300,
+                "metrics": [
+                  [ "AWS/ApiGateway", "Count",       "ApiId", "${HttpApi}", { "label": "Requests" } ],
+                  [ ".",              "4xx",         ".",     ".",          { "label": "4xx" } ],
+                  [ ".",              "5xx",         ".",     ".",          { "label": "5xx" } ]
+                ]
+              }
+            },
+            {
+              "type": "metric",
+              "x": 0, "y": 6, "width": 12, "height": 6,
+              "properties": {
+                "title": "Lambda Invocations (per function)",
+                "region": "${AWS::Region}",
+                "view": "timeSeries",
+                "stacked": true,
+                "stat": "Sum",
+                "period": 300,
+                "metrics": [
+                  [ "AWS/Lambda", "Invocations", "FunctionName", "${GetProductsFunction}" ],
+                  [ ".",          ".",            ".",            "${GetProductFunction}" ],
+                  [ ".",          ".",            ".",            "${CreateProductFunction}" ],
+                  [ ".",          ".",            ".",            "${UpdateProductFunction}" ],
+                  [ ".",          ".",            ".",            "${DeleteProductFunction}" ],
+                  [ ".",          ".",            ".",            "${CreateImageUploadUrlFunction}" ],
+                  [ ".",          ".",            ".",            "${ListCategoriesFunction}" ],
+                  [ ".",          ".",            ".",            "${CreateCategoryFunction}" ],
+                  [ ".",          ".",            ".",            "${UpdateCategoryFunction}" ],
+                  [ ".",          ".",            ".",            "${DeleteCategoryFunction}" ]
+                ]
+              }
+            }
+          ]
+        }
+
 # ---------------------------------------------------------------------------
 # Outputs
 # ---------------------------------------------------------------------------
@@ -988,3 +1173,7 @@ Outputs:
     Value: !Ref SharedLayer
     Export:
       Name: !Sub ${AWS::StackName}-SharedLayerArn
+
+  MonitoringDashboardUrl:
+    Description: Direct URL to the CloudWatch dashboard.
+    Value: !Sub https://${AWS::Region}.console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${MonitoringDashboard}
