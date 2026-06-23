@@ -708,9 +708,13 @@ Resources:
       Environment:
         Variables:
           PRODUCTS_TABLE: !Ref ProductsTable
+          CATEGORIES_TABLE: !Ref CategoriesTable
       Policies:
         - DynamoDBWritePolicy:
             TableName: !Ref ProductsTable
+        # Read access to validate that categoryId references a real category.
+        - DynamoDBReadPolicy:
+            TableName: !Ref CategoriesTable
       Events:
         CreateProduct:
           Type: HttpApi
