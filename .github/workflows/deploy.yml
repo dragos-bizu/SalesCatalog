@@ -1,0 +1,162 @@
+name: Deploy
+
+# Runs on merges/pushes to main. Deploys the backend (SAM) and then the
+# frontend (Vite build -> S3 sync -> CloudFront invalidation).
+on:
+  push:
+    branches:
+      - main
+
+# Never run two deploys at once.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+# Required for GitHub OIDC -> AWS role assumption.
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Backend: build + deploy the SAM stack, export outputs for the frontend.
+  # -------------------------------------------------------------------------
+  deploy-backend:
+    name: Deploy backend (SAM)
+    runs-on: ubuntu-latest
+    outputs:
+      ui_bucket: ${{ steps.outputs.outputs.ui_bucket }}
+      ui_distribution_id: ${{ steps.outputs.outputs.ui_distribution_id }}
+      api_base_url: ${{ steps.outputs.outputs.api_base_url }}
+      images_base_url: ${{ steps.outputs.outputs.images_base_url }}
+      user_pool_id: ${{ steps.outputs.outputs.user_pool_id }}
+      user_pool_client_id: ${{ steps.outputs.outputs.user_pool_client_id }}
+      hosted_ui_base_url: ${{ steps.outputs.outputs.hosted_ui_base_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: SAM build
+        working-directory: infra
+        run: sam build --use-container
+
+      - name: SAM deploy
+        working-directory: infra
+        run: |
+          sam deploy \
+            --stack-name "${{ vars.STACK_NAME }}" \
+            --region "${{ vars.AWS_REGION }}" \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --resolve-s3 \
+            --capabilities CAPABILITY_IAM \
+            --parameter-overrides \
+              Environment="${{ vars.ENVIRONMENT }}" \
+              DomainName="${{ secrets.DOMAIN_NAME }}" \
+              HostedZoneId="${{ secrets.HOSTED_ZONE_ID }}" \
+              GoogleClientId="${{ secrets.GOOGLE_CLIENT_ID }}" \
+              GoogleClientSecret="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
+              BudgetNotificationEmail="${{ secrets.BUDGET_NOTIFICATION_EMAIL }}"
+
+      - name: Read stack outputs
+        id: outputs
+        run: |
+          get() {
+            aws cloudformation describe-stacks \
+              --stack-name "${{ vars.STACK_NAME }}" \
+              --region "${{ vars.AWS_REGION }}" \
+              --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue" \
+              --output text
+          }
+          {
+            echo "ui_bucket=$(get UiBucketName)"
+            echo "ui_distribution_id=$(get UiDistributionId)"
+            echo "api_base_url=$(get ApiBaseUrl)"
+            echo "images_base_url=$(get ImagesBaseUrl)"
+            echo "user_pool_id=$(get UserPoolId)"
+            echo "user_pool_client_id=$(get UserPoolClientId)"
+            echo "hosted_ui_base_url=$(get HostedUiBaseUrl)"
+          } >> "$GITHUB_OUTPUT"
+
+  # -------------------------------------------------------------------------
+  # Frontend: build the React app with backend outputs, sync to S3, invalidate.
+  # Skips automatically until ui/package.json exists.
+  # -------------------------------------------------------------------------
+  deploy-frontend:
+    name: Deploy frontend (Vite)
+    runs-on: ubuntu-latest
+    needs: deploy-backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for UI app
+        id: ui
+        run: |
+          if [ -f ui/package.json ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "ui/package.json not found — frontend deploy skipped."
+          fi
+
+      - name: Set up Node.js
+        if: steps.ui.outputs.exists == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Configure AWS credentials (OIDC)
+        if: steps.ui.outputs.exists == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Install dependencies
+        if: steps.ui.outputs.exists == 'true'
+        working-directory: ui
+        run: npm ci
+
+      - name: Build
+        if: steps.ui.outputs.exists == 'true'
+        working-directory: ui
+        env:
+          VITE_API_BASE_URL: ${{ needs.deploy-backend.outputs.api_base_url }}
+          VITE_IMAGES_BASE_URL: ${{ needs.deploy-backend.outputs.images_base_url }}
+          VITE_COGNITO_DOMAIN: ${{ needs.deploy-backend.outputs.hosted_ui_base_url }}
+          VITE_COGNITO_CLIENT_ID: ${{ needs.deploy-backend.outputs.user_pool_client_id }}
+          VITE_COGNITO_REDIRECT_URI: https://${{ secrets.DOMAIN_NAME }}/auth/callback
+          VITE_COGNITO_LOGOUT_URI: https://${{ secrets.DOMAIN_NAME }}/
+        run: npm run build
+
+      - name: Sync to S3
+        if: steps.ui.outputs.exists == 'true'
+        run: |
+          aws s3 sync ui/dist/ "s3://${{ needs.deploy-backend.outputs.ui_bucket }}/" \
+            --delete --region "${{ vars.AWS_REGION }}"
+
+      - name: Invalidate CloudFront
+        if: steps.ui.outputs.exists == 'true'
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ needs.deploy-backend.outputs.ui_distribution_id }}" \
+            --paths "/*"

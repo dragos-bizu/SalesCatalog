@@ -92,7 +92,7 @@ aws cloudformation deploy \
     GitHubOrg=YOUR_GH_USER \
     GitHubRepo=SalesCatalog \
     GitHubBranch=main \
-    AppStackName=salescatalog-dev
+    AppStackName=SalesCatalog
 ```
 
 > If a GitHub OIDC provider already exists in this AWS account (only one is
@@ -143,7 +143,7 @@ create the following.
 | ------------- | ----------------- |
 | `AWS_REGION`  | `us-east-1`       |
 | `ENVIRONMENT` | `dev`             |
-| `STACK_NAME`  | `salescatalog-dev`|
+| `STACK_NAME`  | `SalesCatalog`    |
 
 > Per the chosen configuration, **all** SAM parameters are supplied from
 > GitHub Secrets/Variables at deploy time — nothing sensitive is committed to
