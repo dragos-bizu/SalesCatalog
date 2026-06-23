@@ -893,9 +893,13 @@ Resources:
       Environment:
         Variables:
           CATEGORIES_TABLE: !Ref CategoriesTable
+          PRODUCTS_TABLE: !Ref ProductsTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref CategoriesTable
+        # Read access to check whether any product still references the category.
+        - DynamoDBReadPolicy:
+            TableName: !Ref ProductsTable
       Events:
         DeleteCategory:
           Type: HttpApi
