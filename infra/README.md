@@ -98,6 +98,23 @@ aws cloudformation deploy \
 > If a GitHub OIDC provider already exists in this AWS account (only one is
 > allowed per account), add `CreateOidcProvider=false` to the
 > `--parameter-overrides` list.
+>
+> **Gotcha:** only set `CreateOidcProvider=false` when the provider was
+> created by a *different* stack/project. If *this* bootstrap stack created
+> the provider, redeploying with `CreateOidcProvider=false` will **delete**
+> it, breaking GitHub Actions with "no OpenIDConnect provider found". Since
+> SalesCatalog is normally the only project using GitHub OIDC in the account,
+> keep `CreateOidcProvider=true` on every bootstrap redeploy and change only
+> the other parameters (e.g. `AppStackName`).
+>
+> To verify the provider exists:
+>
+> ```bash
+> aws iam list-open-id-connect-providers
+> ```
+>
+> The list should contain an ARN ending in
+> `oidc-provider/token.actions.githubusercontent.com`.
 
 ### 2. Capture the deploy role ARN
 
