@@ -1,6 +1,9 @@
 """SalesCatalog shared helpers package (Lambda Layer).
 
-Real implementations land in step 4. Sub-modules:
-    - db    -> DynamoDB client/resource helpers
-    - auth  -> admin identity extraction helpers
+Sub-modules:
+    - db    -> DynamoDB resource/table handles + pagination cursors
+    - auth  -> admin identity extraction from verified JWT claims
+    - http  -> JSON response builders + request body parsing
 """
+
+__all__ = ["db", "auth", "http"]
