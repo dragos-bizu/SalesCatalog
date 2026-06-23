@@ -57,7 +57,10 @@ jobs:
 
       - name: SAM build
         working-directory: infra
-        run: sam build --use-container
+        # No --use-container: the only dependency (aws-lambda-powertools) is
+        # pure Python, so a native build produces portable, identical
+        # artifacts and avoids slow arm64-on-x86 emulation in CI.
+        run: sam build
 
   # -------------------------------------------------------------------------
   # Frontend: lint + test + build (guarded until ui/ exists)

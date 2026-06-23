@@ -54,7 +54,9 @@ jobs:
 
       - name: SAM build
         working-directory: infra
-        run: sam build --use-container
+        # No --use-container: aws-lambda-powertools is pure Python, so a native
+        # build is portable and far faster (no arm64-on-x86 emulation).
+        run: sam build
 
       - name: SAM deploy
         working-directory: infra
