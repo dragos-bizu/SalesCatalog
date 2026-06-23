@@ -4,36 +4,49 @@ GitHub Actions CI/CD pipelines for SalesCatalog.
 
 ## Pipelines
 
-- `deploy.yml` — single pipeline that builds the backend (SAM) and the frontend (Vite), deploys both, and invalidates the CloudFront cache. Triggered on **merges (push) to `main`** and manually via `workflow_dispatch` is **not** enabled — day-to-day work happens on feature branches that are merged into `main` to trigger deployment.
+- `ci.yml` — runs on **pull requests** to `main`. Lint, build and test only; **no AWS access**. Has two jobs: `backend` (pytest + `sam validate --lint` + `sam build`) and `frontend` (npm lint/test/build, skipped until `ui/` exists).
+- `deploy.yml` — runs on **merges (push) to `main`**. Builds and deploys the backend (SAM) then the frontend (Vite → S3 sync → CloudFront invalidation). `workflow_dispatch` is intentionally **not** enabled — deployments are driven by merging into `main`.
 
-AWS credentials are obtained via **GitHub OIDC** (no long-lived access keys are stored in the repository).
+AWS credentials are obtained via **GitHub OIDC** (no long-lived access keys are stored in the repository). All sensitive values are referenced as `${{ secrets.* }}` and non-sensitive ones as `${{ vars.* }}`; the repository slug is read from the built-in `${{ github.repository }}` context, so no real values are committed to the workflow files.
+
+The frontend job in both workflows is **guarded**: it checks for `ui/package.json` and skips gracefully until the React app is created in a later step.
 
 ## High-level steps (deploy.yml)
 
-1. **Checkout** the repository.
-2. **Set up Python 3.12** and **Node.js LTS**.
-3. **Configure AWS credentials** via GitHub OIDC, assuming the role in `AWS_ROLE_TO_ASSUME`.
-4. **Backend**
-   - `sam build` in `infra/`.
-   - `sam deploy --no-confirm-changeset --no-fail-on-empty-changeset` with parameter overrides from secrets.
-   - Capture stack outputs (UI bucket name, CloudFront distribution id, API URL, Cognito values).
-5. **Frontend**
-   - `npm ci` in `ui/`.
-   - Inject env vars from stack outputs into `.env.production`.
-   - `npm run build`.
-   - `aws s3 sync ui/dist/ s3://<ui-bucket>/ --delete`.
-   - `aws cloudfront create-invalidation --paths "/*"`.
+**Job `deploy-backend`:**
+1. Checkout, set up Python 3.12 and the SAM CLI.
+2. Configure AWS credentials via GitHub OIDC (assume `AWS_DEPLOY_ROLE_ARN`).
+3. `sam build --use-container` in `infra/`.
+4. `sam deploy` with parameter overrides from secrets/variables.
+5. Read stack outputs and expose them as job outputs.
+
+**Job `deploy-frontend`** (needs `deploy-backend`, guarded by `ui/package.json`):
+1. Checkout, set up Node.js LTS.
+2. Configure AWS credentials via OIDC.
+3. `npm ci` in `ui/`.
+4. `npm run build` with `VITE_*` env vars injected from the backend job outputs.
+5. `aws s3 sync ui/dist/ s3://<ui-bucket>/ --delete`.
+6. `aws cloudfront create-invalidation --paths "/*"`.
 
 ## Required secrets / variables
 
-| Name                      | Type     | Purpose                                                   |
-| ------------------------- | -------- | --------------------------------------------------------- |
-| `AWS_ROLE_TO_ASSUME`      | secret   | IAM role ARN assumed via OIDC by the workflow.            |
-| `AWS_REGION`              | variable | Deployment region (`us-east-1`).                          |
-| `DOMAIN_NAME`             | variable | UI domain name.                                           |
-| `HOSTED_ZONE_ID`          | secret   | Route 53 hosted zone id.                                  |
-| `GOOGLE_CLIENT_ID`        | secret   | Google OAuth client id.                                   |
-| `GOOGLE_CLIENT_SECRET`    | secret   | Google OAuth client secret.                               |
-| `ENVIRONMENT`             | variable | Environment tag (`prod`, `dev`, ...).                     |
+Configure under **Settings → Secrets and variables → Actions**.
 
-The actual `deploy.yml` file is created in a later step.
+**Secrets:**
+
+| Name                        | Purpose                                          |
+| --------------------------- | ------------------------------------------------ |
+| `AWS_DEPLOY_ROLE_ARN`       | IAM role ARN assumed via OIDC by the workflow.   |
+| `DOMAIN_NAME`               | UI domain name.                                  |
+| `HOSTED_ZONE_ID`            | Route 53 hosted zone id.                         |
+| `GOOGLE_CLIENT_ID`          | Google OAuth client id.                          |
+| `GOOGLE_CLIENT_SECRET`      | Google OAuth client secret.                      |
+| `BUDGET_NOTIFICATION_EMAIL` | Email for cost budget alerts.                    |
+
+**Variables:**
+
+| Name          | Purpose                            |
+| ------------- | ---------------------------------- |
+| `AWS_REGION`  | Deployment region (`us-east-1`).   |
+| `ENVIRONMENT` | Environment tag (`dev`, `prod`).   |
+| `STACK_NAME`  | App stack name (`SalesCatalog`).   |

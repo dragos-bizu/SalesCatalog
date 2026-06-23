@@ -29,7 +29,7 @@ Parameters:
 
   AppStackName:
     Type: String
-    Default: salescatalog-dev
+    Default: SalesCatalog
     Description: Name of the application CloudFormation/SAM stack this role may manage.
 
   CreateOidcProvider:
