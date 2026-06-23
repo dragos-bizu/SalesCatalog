@@ -1,0 +1,378 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: >
+  SalesCatalog CI/CD bootstrap (deploy once, manually).
+  Creates the GitHub Actions OIDC identity provider and a scoped IAM role that
+  GitHub Actions assumes to deploy the main SalesCatalog SAM stack.
+  This stack is intentionally separate from the application stack because it
+  provisions account-level prerequisites that must exist before CI/CD runs.
+
+# ---------------------------------------------------------------------------
+# Parameters
+# ---------------------------------------------------------------------------
+Parameters:
+
+  GitHubOrg:
+    Type: String
+    Description: GitHub organization or user that owns the repository (e.g. "my-user").
+
+  GitHubRepo:
+    Type: String
+    Description: Repository name (e.g. "SalesCatalog").
+
+  GitHubBranch:
+    Type: String
+    Default: main
+    Description: >
+      Branch allowed to assume the deploy role for deployments. Pull-request
+      runs do not assume this role (they only lint/build/test).
+
+  AppStackName:
+    Type: String
+    Default: salescatalog-dev
+    Description: Name of the application CloudFormation/SAM stack this role may manage.
+
+  CreateOidcProvider:
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: >
+      Whether to create the GitHub OIDC provider. Set to "false" if an OIDC
+      provider for token.actions.githubusercontent.com already exists in this
+      account (only one is allowed per account).
+
+# ---------------------------------------------------------------------------
+# Conditions
+# ---------------------------------------------------------------------------
+Conditions:
+  ShouldCreateOidcProvider: !Equals [!Ref CreateOidcProvider, "true"]
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+Resources:
+
+  # -------------------------------------------------------------------------
+  # GitHub Actions OIDC identity provider.
+  #
+  # Only one provider for this URL may exist per AWS account. If you already
+  # have one (e.g. from another project), set CreateOidcProvider=false and the
+  # role below will reference the existing provider by ARN convention.
+  # -------------------------------------------------------------------------
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: ShouldCreateOidcProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      # GitHub's OIDC thumbprint is no longer validated by AWS for this URL,
+      # but the field is still required; AWS accepts this well-known value.
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+      Tags:
+        - Key: Project
+          Value: SalesCatalog
+
+  # -------------------------------------------------------------------------
+  # Deploy role assumed by GitHub Actions via OIDC.
+  #
+  # Trust policy restricts assumption to the specific repo + branch using the
+  # `sub` claim, so no other repository can assume this role.
+  # -------------------------------------------------------------------------
+  GitHubDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub salescatalog-github-deploy-${GitHubRepo}
+      Description: Role assumed by GitHub Actions to deploy the SalesCatalog stack.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - ShouldCreateOidcProvider
+                - !Ref GitHubOidcProvider
+                - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}
+      Tags:
+        - Key: Project
+          Value: SalesCatalog
+
+  # -------------------------------------------------------------------------
+  # Scoped deploy policy.
+  #
+  # Grants only the services the SalesCatalog stack actually uses. Where a
+  # service supports resource-level scoping cleanly we scope it; some services
+  # (CloudFront, Cognito, API Gateway v2, Budgets) primarily authorize on the
+  # action and are granted on "*" but limited to the necessary actions.
+  # -------------------------------------------------------------------------
+  GitHubDeployPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub salescatalog-github-deploy-${GitHubRepo}-policy
+      Roles:
+        - !Ref GitHubDeployRole
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+
+          # --- CloudFormation: manage the app stack + SAM transforms ---------
+          - Sid: CloudFormation
+            Effect: Allow
+            Action:
+              - cloudformation:CreateStack
+              - cloudformation:UpdateStack
+              - cloudformation:DeleteStack
+              - cloudformation:DescribeStacks
+              - cloudformation:DescribeStackEvents
+              - cloudformation:DescribeStackResource
+              - cloudformation:DescribeStackResources
+              - cloudformation:GetTemplate
+              - cloudformation:GetTemplateSummary
+              - cloudformation:CreateChangeSet
+              - cloudformation:DescribeChangeSet
+              - cloudformation:ExecuteChangeSet
+              - cloudformation:DeleteChangeSet
+              - cloudformation:ListStackResources
+              - cloudformation:ValidateTemplate
+            Resource: "*"
+
+          # --- SAM managed artifact bucket (sam deploy uploads zips here) ----
+          - Sid: SamArtifactBucket
+            Effect: Allow
+            Action:
+              - s3:CreateBucket
+              - s3:GetObject
+              - s3:PutObject
+              - s3:GetBucketPolicy
+              - s3:PutBucketPolicy
+              - s3:GetBucketLocation
+              - s3:ListBucket
+              - s3:PutBucketTagging
+              - s3:PutEncryptionConfiguration
+              - s3:PutBucketVersioning
+              - s3:PutBucketPublicAccessBlock
+            Resource:
+              - arn:aws:s3:::aws-sam-cli-managed-default*
+              - arn:aws:s3:::aws-sam-cli-managed-default*/*
+
+          # --- App content buckets (UI sync + images, by name convention) ----
+          - Sid: AppBuckets
+            Effect: Allow
+            Action:
+              - s3:CreateBucket
+              - s3:DeleteBucket
+              - s3:ListBucket
+              - s3:GetObject
+              - s3:PutObject
+              - s3:DeleteObject
+              - s3:GetBucketPolicy
+              - s3:PutBucketPolicy
+              - s3:DeleteBucketPolicy
+              - s3:GetBucketAcl
+              - s3:GetBucketCors
+              - s3:PutBucketCors
+              - s3:GetBucketTagging
+              - s3:PutBucketTagging
+              - s3:GetEncryptionConfiguration
+              - s3:PutEncryptionConfiguration
+              - s3:GetBucketPublicAccessBlock
+              - s3:PutBucketPublicAccessBlock
+              - s3:GetBucketOwnershipControls
+              - s3:PutBucketOwnershipControls
+            Resource:
+              - arn:aws:s3:::salescatalog-*
+              - arn:aws:s3:::salescatalog-*/*
+
+          # --- Lambda + layers ----------------------------------------------
+          - Sid: Lambda
+            Effect: Allow
+            Action:
+              - lambda:CreateFunction
+              - lambda:DeleteFunction
+              - lambda:GetFunction
+              - lambda:GetFunctionConfiguration
+              - lambda:UpdateFunctionCode
+              - lambda:UpdateFunctionConfiguration
+              - lambda:ListVersionsByFunction
+              - lambda:PublishVersion
+              - lambda:PublishLayerVersion
+              - lambda:DeleteLayerVersion
+              - lambda:GetLayerVersion
+              - lambda:AddPermission
+              - lambda:RemovePermission
+              - lambda:TagResource
+              - lambda:UntagResource
+              - lambda:ListTags
+            Resource: "*"
+
+          # --- IAM: manage the per-function execution roles SAM creates ------
+          - Sid: IamForLambdaRoles
+            Effect: Allow
+            Action:
+              - iam:CreateRole
+              - iam:DeleteRole
+              - iam:GetRole
+              - iam:PassRole
+              - iam:AttachRolePolicy
+              - iam:DetachRolePolicy
+              - iam:PutRolePolicy
+              - iam:DeleteRolePolicy
+              - iam:GetRolePolicy
+              - iam:TagRole
+              - iam:UntagRole
+              - iam:ListRolePolicies
+              - iam:ListAttachedRolePolicies
+            Resource:
+              - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:role/${AppStackName}-*
+
+          # --- API Gateway v2 (HTTP API) ------------------------------------
+          - Sid: ApiGateway
+            Effect: Allow
+            Action:
+              - apigateway:GET
+              - apigateway:POST
+              - apigateway:PUT
+              - apigateway:PATCH
+              - apigateway:DELETE
+            Resource: "*"
+
+          # --- Cognito -------------------------------------------------------
+          - Sid: Cognito
+            Effect: Allow
+            Action:
+              - cognito-idp:CreateUserPool
+              - cognito-idp:DeleteUserPool
+              - cognito-idp:UpdateUserPool
+              - cognito-idp:DescribeUserPool
+              - cognito-idp:CreateUserPoolClient
+              - cognito-idp:DeleteUserPoolClient
+              - cognito-idp:UpdateUserPoolClient
+              - cognito-idp:DescribeUserPoolClient
+              - cognito-idp:CreateUserPoolDomain
+              - cognito-idp:DeleteUserPoolDomain
+              - cognito-idp:DescribeUserPoolDomain
+              - cognito-idp:CreateIdentityProvider
+              - cognito-idp:DeleteIdentityProvider
+              - cognito-idp:UpdateIdentityProvider
+              - cognito-idp:DescribeIdentityProvider
+              - cognito-idp:SetUserPoolMfaConfig
+              - cognito-idp:TagResource
+              - cognito-idp:UntagResource
+            Resource: "*"
+
+          # --- DynamoDB ------------------------------------------------------
+          - Sid: DynamoDB
+            Effect: Allow
+            Action:
+              - dynamodb:CreateTable
+              - dynamodb:DeleteTable
+              - dynamodb:DescribeTable
+              - dynamodb:UpdateTable
+              - dynamodb:DescribeContinuousBackups
+              - dynamodb:UpdateContinuousBackups
+              - dynamodb:DescribeTimeToLive
+              - dynamodb:TagResource
+              - dynamodb:UntagResource
+              - dynamodb:ListTagsOfResource
+            Resource:
+              - !Sub arn:${AWS::Partition}:dynamodb:*:${AWS::AccountId}:table/salescatalog-*
+
+          # --- CloudFront + OAC ---------------------------------------------
+          - Sid: CloudFront
+            Effect: Allow
+            Action:
+              - cloudfront:CreateDistribution
+              - cloudfront:DeleteDistribution
+              - cloudfront:GetDistribution
+              - cloudfront:UpdateDistribution
+              - cloudfront:TagResource
+              - cloudfront:UntagResource
+              - cloudfront:CreateOriginAccessControl
+              - cloudfront:DeleteOriginAccessControl
+              - cloudfront:GetOriginAccessControl
+              - cloudfront:UpdateOriginAccessControl
+              - cloudfront:CreateInvalidation
+            Resource: "*"
+
+          # --- ACM (certificate for CloudFront) -----------------------------
+          - Sid: Acm
+            Effect: Allow
+            Action:
+              - acm:RequestCertificate
+              - acm:DeleteCertificate
+              - acm:DescribeCertificate
+              - acm:AddTagsToCertificate
+              - acm:ListTagsForCertificate
+            Resource: "*"
+
+          # --- Route 53 (DNS records + ACM validation) ----------------------
+          - Sid: Route53
+            Effect: Allow
+            Action:
+              - route53:ChangeResourceRecordSets
+              - route53:GetHostedZone
+              - route53:ListHostedZones
+              - route53:GetChange
+              - route53:ListResourceRecordSets
+            Resource: "*"
+
+          # --- CloudWatch Logs (log groups w/ retention) --------------------
+          - Sid: Logs
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:DeleteLogGroup
+              - logs:DescribeLogGroups
+              - logs:PutRetentionPolicy
+              - logs:TagResource
+              - logs:UntagResource
+              - logs:ListTagsForResource
+            Resource: "*"
+
+          # --- CloudWatch dashboard -----------------------------------------
+          - Sid: CloudWatchDashboard
+            Effect: Allow
+            Action:
+              - cloudwatch:PutDashboard
+              - cloudwatch:DeleteDashboards
+              - cloudwatch:GetDashboard
+              - cloudwatch:ListDashboards
+            Resource: "*"
+
+          # --- Budgets -------------------------------------------------------
+          - Sid: Budgets
+            Effect: Allow
+            Action:
+              - budgets:CreateBudget
+              - budgets:ModifyBudget
+              - budgets:DeleteBudget
+              - budgets:ViewBudget
+            Resource: "*"
+
+          # --- SSM (SAM stores parameters; future-proofing) -----------------
+          - Sid: Ssm
+            Effect: Allow
+            Action:
+              - ssm:GetParameter
+              - ssm:GetParameters
+            Resource:
+              - !Sub arn:${AWS::Partition}:ssm:*:${AWS::AccountId}:parameter/salescatalog/*
+
+# ---------------------------------------------------------------------------
+# Outputs
+# ---------------------------------------------------------------------------
+Outputs:
+
+  DeployRoleArn:
+    Description: ARN of the role GitHub Actions assumes. Store as the AWS_DEPLOY_ROLE_ARN secret.
+    Value: !GetAtt GitHubDeployRole.Arn
