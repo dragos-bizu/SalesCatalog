@@ -51,12 +51,16 @@ def _table_name(env_var: str) -> str:
 
 def products_table():
     """Return the DynamoDB Table handle for products."""
-    return _resource().Table(_table_name("PRODUCTS_TABLE"))
+    # Resolve the name first so a missing env var fails fast with a clear
+    # RuntimeError before any boto3 client (which needs a region) is created.
+    name = _table_name("PRODUCTS_TABLE")
+    return _resource().Table(name)
 
 
 def categories_table():
     """Return the DynamoDB Table handle for categories."""
-    return _resource().Table(_table_name("CATEGORIES_TABLE"))
+    name = _table_name("CATEGORIES_TABLE")
+    return _resource().Table(name)
 
 
 def clamp_page_size(value: Any) -> int:
