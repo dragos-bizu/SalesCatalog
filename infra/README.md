@@ -64,8 +64,107 @@ sam local start-api
 sam validate --lint
 ```
 
+## CI/CD bootstrap (one-time manual setup)
+
+Before GitHub Actions can deploy the application, a few account-level
+prerequisites must exist. These are **not** part of the application stack
+(`template.yaml`) because they must exist *before* CI/CD runs and are managed
+separately in `bootstrap.yaml`.
+
+Perform these steps once, manually, with an admin AWS identity.
+
+### 1. Deploy the bootstrap stack (OIDC provider + scoped deploy role)
+
+`bootstrap.yaml` creates:
+
+- a **GitHub Actions OIDC identity provider** for `token.actions.githubusercontent.com`, and
+- a **scoped IAM role** that GitHub Actions assumes (via OIDC) to deploy the app.
+
+The role's trust policy is restricted to a specific `owner/repo` and branch, so
+no other repository can assume it.
+
+```bash
+aws cloudformation deploy \
+  --template-file infra/bootstrap.yaml \
+  --stack-name salescatalog-bootstrap \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides \
+    GitHubOrg=YOUR_GH_USER \
+    GitHubRepo=SalesCatalog \
+    GitHubBranch=main \
+    AppStackName=salescatalog-dev
+```
+
+> If a GitHub OIDC provider already exists in this AWS account (only one is
+> allowed per account), add `CreateOidcProvider=false` to the
+> `--parameter-overrides` list.
+
+### 2. Capture the deploy role ARN
+
+```bash
+aws cloudformation describe-stacks \
+  --stack-name salescatalog-bootstrap \
+  --query "Stacks[0].Outputs[?OutputKey=='DeployRoleArn'].OutputValue" \
+  --output text
+```
+
+Save the output — it is used as the `AWS_DEPLOY_ROLE_ARN` GitHub secret.
+
+### 3. Create the Google OAuth client
+
+In the [Google Cloud Console](https://console.cloud.google.com/apis/credentials),
+create an **OAuth 2.0 Client ID** of type *Web application*. Note the
+**Client ID** and **Client Secret**.
+
+After the first application deploy, return here and add to the same client:
+
+- **Authorized JavaScript origin:** the `HostedUiBaseUrl` stack output.
+- **Authorized redirect URI:** `<HostedUiBaseUrl>/oauth2/idpresponse`.
+
+### 4. Configure GitHub Secrets and Variables
+
+In the GitHub repository, under **Settings → Secrets and variables → Actions**,
+create the following.
+
+**Secrets** (sensitive):
+
+| Secret name                 | Value                                                  |
+| --------------------------- | ------------------------------------------------------ |
+| `AWS_DEPLOY_ROLE_ARN`       | Deploy role ARN from step 2.                           |
+| `GOOGLE_CLIENT_ID`          | Google OAuth Client ID from step 3.                    |
+| `GOOGLE_CLIENT_SECRET`      | Google OAuth Client Secret from step 3.                |
+| `HOSTED_ZONE_ID`            | Route 53 Hosted Zone ID for the domain.                |
+| `DOMAIN_NAME`               | Public UI domain (e.g. `catalog.example.com`).         |
+| `BUDGET_NOTIFICATION_EMAIL` | Email address that receives cost budget alerts.        |
+
+**Variables** (non-sensitive):
+
+| Variable name | Value             |
+| ------------- | ----------------- |
+| `AWS_REGION`  | `us-east-1`       |
+| `ENVIRONMENT` | `dev`             |
+| `STACK_NAME`  | `salescatalog-dev`|
+
+> Per the chosen configuration, **all** SAM parameters are supplied from
+> GitHub Secrets/Variables at deploy time — nothing sensitive is committed to
+> the repository (`samconfig.toml` is git-ignored).
+
+### 5. Enable IAM access to Billing (required for Budgets)
+
+The application stack creates an `AWS::Budgets::Budget`. In the AWS account
+(root user): **Account → IAM user and role access to Billing information →
+Activate**. This is a one-time account setting.
+
+### 6. First deploy and post-deploy wiring
+
+1. Trigger the first deploy (push/merge to `main`, or run `sam deploy` locally).
+2. Read the stack outputs (`UserPoolDomain`, `HostedUiBaseUrl`, `ApiBaseUrl`, ...).
+3. Complete the Google OAuth redirect URIs from step 3.
+4. Confirm the **AWS Budgets** confirmation email so cost alerts are delivered.
+
 ## Notes
 
 - The ACM certificate for CloudFront **must** be in `us-east-1`. Since the entire stack is deployed in `us-east-1`, this is handled in the same template.
+- The bootstrap stack (`bootstrap.yaml`) is deployed **once** and rarely changes; the application stack (`template.yaml`) is deployed continuously by CI/CD.
 - The Cognito Hosted UI handles the Google OAuth dance — the React app only needs to redirect users to it and read the returned tokens.
 - All Lambda IAM roles follow the principle of least privilege (only the specific table, bucket, and actions they need).
