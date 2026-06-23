@@ -736,9 +736,13 @@ Resources:
       Environment:
         Variables:
           PRODUCTS_TABLE: !Ref ProductsTable
+          CATEGORIES_TABLE: !Ref CategoriesTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ProductsTable
+        # Read access to validate a changed categoryId.
+        - DynamoDBReadPolicy:
+            TableName: !Ref CategoriesTable
       Events:
         UpdateProduct:
           Type: HttpApi
