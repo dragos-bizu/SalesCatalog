@@ -593,8 +593,13 @@ Resources:
     Type: AWS::Serverless::LayerVersion
     Properties:
       LayerName: !Sub salescatalog-${Environment}-shared
-      Description: SalesCatalog shared helpers (db, auth) for Lambda handlers.
-      ContentUri: ../src/shared/
+      Description: SalesCatalog shared helpers (db, auth, http) for Lambda handlers.
+      # ContentUri points at the inner python/ folder. SAM's python builder
+      # copies the folder's contents into a python/ directory in the layer,
+      # yielding python/salescatalog_shared (i.e. /opt/python/salescatalog_shared
+      # at runtime). Pointing at ../src/shared/ instead would double-nest as
+      # python/python/salescatalog_shared and break imports.
+      ContentUri: ../src/shared/python/
       CompatibleRuntimes:
         - python3.12
       CompatibleArchitectures:
