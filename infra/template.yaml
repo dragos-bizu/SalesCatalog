@@ -708,9 +708,13 @@ Resources:
       Environment:
         Variables:
           PRODUCTS_TABLE: !Ref ProductsTable
+          CATEGORIES_TABLE: !Ref CategoriesTable
       Policies:
         - DynamoDBWritePolicy:
             TableName: !Ref ProductsTable
+        # Read access to validate that categoryId references a real category.
+        - DynamoDBReadPolicy:
+            TableName: !Ref CategoriesTable
       Events:
         CreateProduct:
           Type: HttpApi
@@ -732,9 +736,13 @@ Resources:
       Environment:
         Variables:
           PRODUCTS_TABLE: !Ref ProductsTable
+          CATEGORIES_TABLE: !Ref CategoriesTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref ProductsTable
+        # Read access to validate a changed categoryId.
+        - DynamoDBReadPolicy:
+            TableName: !Ref CategoriesTable
       Events:
         UpdateProduct:
           Type: HttpApi
@@ -885,9 +893,13 @@ Resources:
       Environment:
         Variables:
           CATEGORIES_TABLE: !Ref CategoriesTable
+          PRODUCTS_TABLE: !Ref ProductsTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref CategoriesTable
+        # Read access to check whether any product still references the category.
+        - DynamoDBReadPolicy:
+            TableName: !Ref ProductsTable
       Events:
         DeleteCategory:
           Type: HttpApi
