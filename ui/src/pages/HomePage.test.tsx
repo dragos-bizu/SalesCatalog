@@ -2,15 +2,13 @@ import { render, screen } from "@testing-library/react";
 import { HomePage } from "./HomePage";
 
 describe("HomePage", () => {
-  it("renders the app title", () => {
+  it("renders the catalog title", () => {
     render(<HomePage />);
     expect(screen.getByText("SalesCatalog")).toBeInTheDocument();
   });
 
-  it("renders the get started button", () => {
+  it("mentions the upcoming public catalog content", () => {
     render(<HomePage />);
-    expect(
-      screen.getByRole("button", { name: /get started/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/public catalog/i)).toBeInTheDocument();
   });
 });

@@ -1,41 +1,22 @@
-import AppBar from "@mui/material/AppBar";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Container from "@mui/material/Container";
 import Paper from "@mui/material/Paper";
-import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
-import StorefrontIcon from "@mui/icons-material/Storefront";
 
 /**
- * Temporary landing page used to verify the Vite + MUI scaffold renders.
- * Replaced by the real catalog pages in later steps.
+ * Public home page (stub).
+ *
+ * Will host the search bar, category tabs (incl. "All products"), and the
+ * product grid in a later step.
  */
 export function HomePage() {
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
-      <AppBar position="static">
-        <Toolbar>
-          <StorefrontIcon sx={{ mr: 1 }} />
-          <Typography variant="h6" component="div">
-            SalesCatalog
-          </Typography>
-        </Toolbar>
-      </AppBar>
-
-      <Container maxWidth="sm" sx={{ py: 6 }}>
-        <Paper sx={{ p: 4, textAlign: "center" }}>
-          <Typography variant="h4" gutterBottom>
-            It works! 🎉
-          </Typography>
-          <Typography color="text.secondary" sx={{ mb: 3 }}>
-            Vite + React + TypeScript + Material UI scaffold is up and running.
-          </Typography>
-          <Button variant="contained" size="large">
-            Get started
-          </Button>
-        </Paper>
-      </Container>
-    </Box>
+    <Paper sx={{ p: 4 }}>
+      <Typography variant="h4" gutterBottom>
+        SalesCatalog
+      </Typography>
+      <Typography color="text.secondary">
+        Public catalog will appear here: search bar, category tabs (with an
+        "All products" tab), and the product grid.
+      </Typography>
+    </Paper>
   );
 }

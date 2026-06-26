@@ -1,22 +1,23 @@
 import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
 import { Provider } from "react-redux";
+import { RouterProvider } from "react-router-dom";
 import { store } from "../store/store";
 import { theme } from "../theme/theme";
-import { HomePage } from "../pages/HomePage";
+import { router } from "./routes";
 
 /**
  * Root application component.
  *
- * Wires the Redux store + MUI theme + baseline reset around the app.
- * Routing and auth are added in later steps.
+ * Wires the Redux store + MUI theme + baseline reset + the React Router
+ * around the app. Cognito auth lands in a later step.
  */
 export default function App() {
   return (
     <Provider store={store}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <HomePage />
+        <RouterProvider router={router} />
       </ThemeProvider>
     </Provider>
   );
