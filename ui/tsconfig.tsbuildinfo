@@ -1,1 +1,1 @@
-{"root":["./src/main.tsx","./src/app/App.tsx","./src/pages/HomePage.tsx","./src/theme/theme.ts"],"version":"5.9.3"}
+{"root":["./src/main.tsx","./src/vite-env.d.ts","./src/app/App.tsx","./src/app/config.ts","./src/domain/types.ts","./src/hooks/redux.ts","./src/pages/HomePage.tsx","./src/services/api.ts","./src/store/categoriesSlice.ts","./src/store/productsSlice.ts","./src/store/store.ts","./src/theme/theme.ts"],"version":"5.9.3"}
