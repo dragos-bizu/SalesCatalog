@@ -851,7 +851,9 @@ Resources:
         Variables:
           CATEGORIES_TABLE: !Ref CategoriesTable
       Policies:
-        - DynamoDBWritePolicy:
+        # CrudPolicy (not WritePolicy) because the handler performs a Scan to
+        # enforce case-insensitive name uniqueness. WritePolicy lacks Scan.
+        - DynamoDBCrudPolicy:
             TableName: !Ref CategoriesTable
       Events:
         CreateCategory:
