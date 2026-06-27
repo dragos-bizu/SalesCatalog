@@ -56,6 +56,33 @@ describe("api service", () => {
     await expect(api.getProduct("ghost")).rejects.toThrow("Product not found");
   });
 
+  it("awaits an async token provider before sending", async () => {
+    const fetchMock = mockFetch(201, { id: "p1" });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    setTokenProvider(async () => {
+      await new Promise((r) => setTimeout(r, 5));
+      return "refreshed-token";
+    });
+
+    await api.createProduct({ name: "Apple", categoryId: "c1" });
+
+    const init = fetchMock.mock.calls[0][1];
+    expect(init.headers["Authorization"]).toBe("Bearer refreshed-token");
+  });
+
+  it("omits Authorization when async provider returns null", async () => {
+    const fetchMock = mockFetch(401, { message: "Unauthorized" });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    setTokenProvider(async () => null);
+
+    await expect(
+      api.createProduct({ name: "X", categoryId: "c1" }),
+    ).rejects.toThrow(ApiError);
+
+    const init = fetchMock.mock.calls[0][1];
+    expect(init.headers["Authorization"]).toBeUndefined();
+  });
+
   it("returns undefined for 204 responses", async () => {
     const fetchMock = mockFetch(204, undefined);
     global.fetch = fetchMock as unknown as typeof fetch;
