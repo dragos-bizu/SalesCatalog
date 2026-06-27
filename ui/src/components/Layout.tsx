@@ -6,12 +6,15 @@ import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import { Link as RouterLink, Outlet } from "react-router-dom";
+import { useAuthManager } from "../managers/AuthManager";
 
 /**
  * Application chrome shared by every route: the top AppBar and the main
  * content container. Individual pages render inside <Outlet />.
  */
 export function Layout() {
+  const { isAuthenticated, email, signOut } = useAuthManager();
+
   return (
     <Box sx={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <AppBar position="sticky">
@@ -25,12 +28,29 @@ export function Layout() {
           >
             SalesCatalog
           </Button>
-          <Button component={RouterLink} to="/admin" color="inherit">
-            Admin
-          </Button>
-          <Button component={RouterLink} to="/login" color="inherit">
-            Sign in
-          </Button>
+          {isAuthenticated ? (
+            <>
+              <Button component={RouterLink} to="/admin" color="inherit">
+                Admin
+              </Button>
+              {email && (
+                <Typography
+                  variant="body2"
+                  sx={{ mx: 1, opacity: 0.85 }}
+                  data-testid="auth-email"
+                >
+                  {email}
+                </Typography>
+              )}
+              <Button color="inherit" onClick={signOut}>
+                Sign out
+              </Button>
+            </>
+          ) : (
+            <Button component={RouterLink} to="/login" color="inherit">
+              Sign in
+            </Button>
+          )}
         </Toolbar>
       </AppBar>
 
