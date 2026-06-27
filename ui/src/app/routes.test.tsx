@@ -4,8 +4,13 @@
 // the data-router API requires Fetch globals at module init, which jsdom
 // doesn't provide. The component->path mapping under test is identical.
 
-import { render, screen } from "@testing-library/react";
+import { configureStore } from "@reduxjs/toolkit";
+import { render, screen, waitFor } from "@testing-library/react";
+import { Provider } from "react-redux";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import authReducer from "../store/authSlice";
+import productsReducer from "../store/productsSlice";
+import categoriesReducer from "../store/categoriesSlice";
 import { Layout } from "../components/Layout";
 import { RequireAuth } from "../components/RequireAuth";
 import { HomePage } from "../pages/HomePage";
@@ -64,10 +69,19 @@ function AppRoutes() {
 }
 
 function renderAt(initial: string) {
+  const store = configureStore({
+    reducer: {
+      auth: authReducer,
+      products: productsReducer,
+      categories: categoriesReducer,
+    },
+  });
   return render(
-    <MemoryRouter initialEntries={[initial]}>
-      <AppRoutes />
-    </MemoryRouter>,
+    <Provider store={store}>
+      <MemoryRouter initialEntries={[initial]}>
+        <AppRoutes />
+      </MemoryRouter>
+    </Provider>,
   );
 }
 
@@ -88,9 +102,12 @@ describe("router", () => {
     expect(screen.getByText(/admin sign in/i)).toBeInTheDocument();
   });
 
-  it("renders the auth callback page", () => {
-    renderAt("/auth/callback");
-    expect(screen.getByText(/completing sign-in/i)).toBeInTheDocument();
+  it("renders the auth callback page", async () => {
+    // No ?code= present -> async useEffect transitions to the error path.
+    renderAt("/auth/callback?");
+    await waitFor(() => {
+      expect(screen.getByText(/sign-in failed/i)).toBeInTheDocument();
+    });
   });
 
   it("redirects unauthenticated users from /admin to /login", () => {
