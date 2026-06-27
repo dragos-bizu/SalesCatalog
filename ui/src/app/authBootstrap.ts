@@ -1,11 +1,10 @@
-// Wires the api service to the Redux auth slice so admin API requests
-// automatically include the current Cognito id token. Called once at app
-// startup from main.tsx.
+// Wires the api service to the auth layer so admin API requests automatically
+// include a valid, non-expired Cognito id token. Uses the silent-refresh
+// helper from AuthManager so near-expired tokens are refreshed transparently.
 
+import { ensureFreshTokenStandalone } from "../managers/AuthManager";
 import { setTokenProvider } from "../services/api";
-import { selectIdToken } from "../store/authSlice";
-import { store } from "../store/store";
 
 export function installTokenProvider(): void {
-  setTokenProvider(() => selectIdToken(store.getState()));
+  setTokenProvider(() => ensureFreshTokenStandalone());
 }

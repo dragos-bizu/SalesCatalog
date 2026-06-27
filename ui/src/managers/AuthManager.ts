@@ -30,6 +30,10 @@ const PKCE_STATE_KEY = "salescatalog.auth.pkce";
 // Refresh proactively when less than 60 seconds remain on the id token.
 const REFRESH_EARLY_MS = 60_000;
 
+// Single in-flight refresh promise so concurrent admin requests share one
+// refresh round-trip instead of triggering N parallel ones.
+let inFlightRefresh: Promise<string | null> | null = null;
+
 interface PkceState {
   verifier: string;
   state: string;
@@ -62,6 +66,38 @@ function toTokensPayload(res: TokenResponse) {
     refreshToken: res.refresh_token ?? null,
     expiresAt: Date.now() + res.expires_in * 1000,
   };
+}
+
+/**
+ * Module-level (non-hook) version of ensureFreshToken used by the API client.
+ *
+ * Returns the current id token, transparently refreshing it when it's near
+ * expiry. Concurrent calls share a single in-flight refresh. Returns null
+ * when no session exists or refresh fails (caller falls back to unauth).
+ */
+export async function ensureFreshTokenStandalone(): Promise<string | null> {
+  const { idToken, expiresAt, refreshToken } = store.getState().auth;
+  if (!idToken || !expiresAt) return null;
+  if (expiresAt - Date.now() > REFRESH_EARLY_MS) return idToken;
+  if (!refreshToken) {
+    store.dispatch(signedOut());
+    return null;
+  }
+  if (inFlightRefresh) return inFlightRefresh;
+  inFlightRefresh = (async () => {
+    try {
+      const tokens = await refreshTokens(refreshToken);
+      const payload = toTokensPayload(tokens);
+      store.dispatch(tokensSet(payload));
+      return payload.idToken;
+    } catch {
+      store.dispatch(signedOut());
+      return null;
+    } finally {
+      inFlightRefresh = null;
+    }
+  })();
+  return inFlightRefresh;
 }
 
 export interface UseAuthManager {
@@ -120,26 +156,12 @@ export function useAuthManager(): UseAuthManager {
     window.location.assign(buildLogoutUrl());
   }, [dispatch]);
 
-  const ensureFreshToken = useCallback(async () => {
-    // Read fresh state from the store directly to avoid stale closures.
-    const state = store.getState().auth;
-    const { idToken, expiresAt, refreshToken } = state;
-    if (!idToken || !expiresAt) return null;
-    if (expiresAt - Date.now() > REFRESH_EARLY_MS) return idToken;
-    if (!refreshToken) {
-      dispatch(signedOut());
-      return null;
-    }
-    try {
-      const tokens = await refreshTokens(refreshToken);
-      const payload = toTokensPayload(tokens);
-      dispatch(tokensSet(payload));
-      return payload.idToken;
-    } catch {
-      dispatch(signedOut());
-      return null;
-    }
-  }, [dispatch]);
+  // The hook simply delegates to the standalone function so the same logic
+  // (including in-flight refresh deduping) is shared with the API client.
+  const ensureFreshToken = useCallback(
+    () => ensureFreshTokenStandalone(),
+    [],
+  );
 
   return {
     isAuthenticated,

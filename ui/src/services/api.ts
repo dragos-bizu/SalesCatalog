@@ -23,11 +23,18 @@ export class ApiError extends Error {
   }
 }
 
-// Auth token provider, injected by the auth layer. Returns the current
-// Cognito ID token, or null when not signed in.
-let tokenProvider: () => string | null = () => null;
+// Auth token provider, injected by the auth layer. May return a token
+// synchronously *or* asynchronously: the auth layer uses an async provider
+// so it can transparently refresh near-expired tokens before each admin
+// request. Returns null when no admin session exists.
+export type TokenProvider = () =>
+  | string
+  | null
+  | Promise<string | null>;
 
-export function setTokenProvider(provider: () => string | null): void {
+let tokenProvider: TokenProvider = () => null;
+
+export function setTokenProvider(provider: TokenProvider): void {
   tokenProvider = provider;
 }
 
@@ -40,7 +47,7 @@ async function request<T>(
   const headers: Record<string, string> = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (auth) {
-    const token = tokenProvider();
+    const token = await tokenProvider();
     if (token) headers["Authorization"] = `Bearer ${token}`;
   }
 
