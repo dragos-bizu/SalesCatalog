@@ -2,6 +2,7 @@ import KeyboardArrowLeftIcon from "@mui/icons-material/KeyboardArrowLeft";
 import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Fade from "@mui/material/Fade";
 import MobileStepper from "@mui/material/MobileStepper";
 import Typography from "@mui/material/Typography";
 import { type TouchEvent, useMemo, useRef, useState } from "react";
@@ -93,26 +94,29 @@ export function ProductImageCarousel({ productName, images }: ProductImageCarous
 
   return (
     <Box sx={{ border: 1, borderColor: "divider", borderRadius: 1, overflow: "hidden" }}>
-      <Box
-        component="img"
-        src={activeImage}
-        alt={`${productName} image ${activeImageIndex + 1}`}
-        onTouchStart={(e: TouchEvent<HTMLImageElement>) =>
-          onTouchStart(e.changedTouches[0].clientX)
-        }
-        onTouchMove={(e: TouchEvent<HTMLImageElement>) =>
-          onTouchMove(e.changedTouches[0].clientX)
-        }
-        onTouchEnd={onTouchEnd}
-        sx={{
-          width: "100%",
-          maxHeight: 420,
-          objectFit: "cover",
-          display: "block",
-          touchAction: "pan-y",
-          userSelect: "none",
-        }}
-      />
+      <Fade in key={activeImage} timeout={220}>
+        <Box
+          component="img"
+          src={activeImage}
+          alt={`${productName} image ${activeImageIndex + 1}`}
+          onTouchStart={(e: TouchEvent<HTMLImageElement>) =>
+            onTouchStart(e.changedTouches[0].clientX)
+          }
+          onTouchMove={(e: TouchEvent<HTMLImageElement>) =>
+            onTouchMove(e.changedTouches[0].clientX)
+          }
+          onTouchEnd={onTouchEnd}
+          sx={{
+            width: "100%",
+            maxHeight: 420,
+            objectFit: "cover",
+            display: "block",
+            touchAction: "pan-y",
+            userSelect: "none",
+            willChange: "opacity, transform",
+          }}
+        />
+      </Fade>
 
       {imageUrls.length > 1 && (
         <MobileStepper
