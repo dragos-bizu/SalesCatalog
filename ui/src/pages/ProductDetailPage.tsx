@@ -7,18 +7,11 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { config } from "../app/config";
+import { ProductImageCarousel } from "../components/ProductImageCarousel";
 import type { Product } from "../domain/types";
 import { useCategoryManager } from "../managers/CategoryManager";
 import { useProductManager } from "../managers/ProductManager";
 import { ApiError } from "../services/api";
-
-function toImageUrl(image: string): string | null {
-  if (image.startsWith("http://") || image.startsWith("https://")) return image;
-  const base = config.imagesBaseUrl?.trim();
-  if (!base) return null;
-  return `${base.replace(/\/$/, "")}/${image.replace(/^\//, "")}`;
-}
 
 function DetailSkeleton() {
   return (
@@ -106,7 +99,7 @@ export function ProductDetailPage() {
     );
   }
 
-  const firstImage = product.images[0] ? toImageUrl(product.images[0]) : null;
+
 
   return (
     <Paper sx={{ p: 3 }}>
@@ -119,37 +112,7 @@ export function ProductDetailPage() {
           </Stack>
         </Box>
 
-        {firstImage ? (
-          <Box
-            component="img"
-            src={firstImage}
-            alt={product.name}
-            sx={{
-              width: "100%",
-              maxHeight: 420,
-              objectFit: "cover",
-              borderRadius: 1,
-              border: 1,
-              borderColor: "divider",
-            }}
-          />
-        ) : (
-          <Box
-            sx={{
-              height: 320,
-              bgcolor: "common.white",
-              color: "text.secondary",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              border: 1,
-              borderColor: "divider",
-              borderRadius: 1,
-            }}
-          >
-            <Typography>No image</Typography>
-          </Box>
-        )}
+        <ProductImageCarousel productName={product.name} images={product.images} />
 
         <Box>
           <Typography variant="subtitle1" gutterBottom>
