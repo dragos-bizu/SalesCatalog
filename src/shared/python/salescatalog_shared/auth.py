@@ -75,7 +75,9 @@ def get_admin_identity(event: dict[str, Any]) -> dict[str, str]:
     }
 
 
-def require_admin(event: dict[str, Any], required_group: str | None = None) -> dict[str, str]:
+def require_admin(
+    event: dict[str, Any], required_group: str | None = None
+) -> dict[str, str]:
     """Authorize request as admin and return normalized identity.
 
     Group enforcement is enabled when ``required_group`` is provided or when
@@ -105,6 +107,7 @@ def require_admin(event: dict[str, Any], required_group: str | None = None) -> d
 
     claims = get_claims(event)
     groups = _groups_from_claims(claims)
+    print(f"require_admin: user groups = {groups}, required group = '{group}'")
     if group not in groups:
         raise ForbiddenError(f"Admin access requires Cognito group '{group}'")
 
