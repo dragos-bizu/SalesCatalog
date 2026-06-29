@@ -8,9 +8,15 @@ import { Link as RouterLink } from "react-router-dom";
 import { config } from "../app/config";
 import type { Product } from "../domain/types";
 
-function toImageUrl(image: string): string {
+function toImageUrl(image: string): string | null {
+  // Already absolute URL (e.g. when backend stored publicUrl directly).
   if (image.startsWith("http://") || image.startsWith("https://")) return image;
-  return `${config.imagesBaseUrl.replace(/\/$/, "")}/${image.replace(/^\//, "")}`;
+
+  // Relative key (e.g. products/<uuid>.jpg) needs the CDN base URL.
+  const base = config.imagesBaseUrl?.trim();
+  if (!base) return null;
+
+  return `${base.replace(/\/$/, "")}/${image.replace(/^\//, "")}`;
 }
 
 export interface ProductCardProps {
