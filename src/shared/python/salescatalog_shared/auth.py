@@ -107,9 +107,10 @@ def require_admin(
 
     claims = get_claims(event)
     groups = _groups_from_claims(claims)
-    print(f"require_admin: user groups = {groups}, required group = '{group}'")
-    if group not in groups:
-        raise ForbiddenError(f"Admin access requires Cognito group '{group}'")
+    if not any(group in g for g in groups):
+        raise ForbiddenError(
+            f"User is not authorized as admin (missing group '{group}')"
+        )
 
     return {
         "sub": str(claims.get("sub", "")),
