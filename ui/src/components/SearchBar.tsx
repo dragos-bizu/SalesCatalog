@@ -20,7 +20,15 @@ export interface SearchBarProps {
 export function SearchBar({ value, onChange, onSearch, disabled }: SearchBarProps) {
   const { t } = useTranslation();
   return (
-    <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 2 }}>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: { xs: "column", sm: "row" },
+        gap: 1,
+        alignItems: { xs: "stretch", sm: "center" },
+        mb: 2,
+      }}
+    >
       <TextField
         fullWidth
         size="small"
@@ -39,6 +47,11 @@ export function SearchBar({ value, onChange, onSearch, disabled }: SearchBarProp
         startIcon={<SearchIcon />}
         onClick={onSearch}
         disabled={disabled}
+        sx={{
+          width: { xs: "100%", sm: "auto" },
+          px: { xs: 2, sm: 1.75 },
+          py: { xs: 1, sm: 0.5 },
+        }}
       >
         {t("search.button")}
       </Button>
