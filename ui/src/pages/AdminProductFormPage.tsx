@@ -1,36 +1,23 @@
-import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import SaveIcon from "@mui/icons-material/Save";
 import Alert from "@mui/material/Alert";
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
-import Divider from "@mui/material/Divider";
-import FormControl from "@mui/material/FormControl";
-import InputLabel from "@mui/material/InputLabel";
-import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
-import Select from "@mui/material/Select";
 import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
-import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
-import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
-import { uploadImages } from "../managers/ImageManager";
+import { useNavigate, useParams } from "react-router-dom";
+import {
+  ProductBasicFields,
+  type ProductFormState,
+} from "../components/admin/ProductBasicFields";
+import { ProductFormHeader } from "../components/admin/ProductFormHeader";
+import { ProductFormSubmit } from "../components/admin/ProductFormSubmit";
+import { ProductImagesSection } from "../components/admin/ProductImagesSection";
 import { useCategoryManager } from "../managers/CategoryManager";
+import { uploadImages } from "../managers/ImageManager";
 import { useProductManager } from "../managers/ProductManager";
 
-interface FormState {
-  name: string;
-  categoryId: string;
-  ean: string;
-  description: string;
-  images: string[]; // backend expects keys (or URLs if already absolute)
-}
-
-const EMPTY_FORM: FormState = {
+const EMPTY_FORM: ProductFormState = {
   name: "",
   categoryId: "",
   ean: "",
@@ -68,7 +55,7 @@ export function AdminProductFormPage() {
     create: createCategory,
   } = categoryManager;
 
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [form, setForm] = useState<ProductFormState>(EMPTY_FORM);
   const [newCategoryName, setNewCategoryName] = useState("");
 
   const [loading, setLoading] = useState(mode === "edit");
@@ -125,7 +112,10 @@ export function AdminProductFormPage() {
     [form.name, form.categoryId],
   );
 
-  function update<K extends keyof FormState>(key: K, value: FormState[K]) {
+  function update<K extends keyof ProductFormState>(
+    key: K,
+    value: ProductFormState[K],
+  ) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -227,119 +217,39 @@ export function AdminProductFormPage() {
   return (
     <Paper sx={{ p: 3 }}>
       <Stack spacing={3}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Typography variant="h4">
-            {mode === "new" ? "New product" : "Edit product"}
-          </Typography>
-          <Button component={RouterLink} to="/admin" startIcon={<ArrowBackIcon />}>
-            Back
-          </Button>
-        </Stack>
+        <ProductFormHeader mode={mode} />
 
-        <Stack spacing={2}>
-          <TextField
-            label="Name"
-            required
-            value={form.name}
-            onChange={(e) => update("name", e.target.value)}
-          />
+        <ProductBasicFields
+          form={form}
+          categories={categories}
+          newCategoryName={newCategoryName}
+          creatingCategory={creatingCategory}
+          onFormChange={update}
+          onNewCategoryNameChange={setNewCategoryName}
+          onCreateCategory={onCreateCategory}
+        />
 
-          <FormControl fullWidth required>
-            <InputLabel id="category-label">Category</InputLabel>
-            <Select
-              labelId="category-label"
-              label="Category"
-              value={form.categoryId}
-              onChange={(e) => update("categoryId", e.target.value)}
-            >
-              {categories.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+        <ProductImagesSection
+          images={form.images}
+          selectedFiles={selectedFiles}
+          uploading={uploading}
+          onSelectFiles={onSelectFiles}
+          onUploadFiles={onUploadFiles}
+          onRemoveImage={(key) =>
+            setForm((prev) => ({
+              ...prev,
+              images: prev.images.filter((k) => k !== key),
+            }))
+          }
+        />
 
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-            <TextField
-              fullWidth
-              label="Create new category"
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-            />
-            <Button
-              variant="outlined"
-              onClick={onCreateCategory}
-              disabled={creatingCategory || !newCategoryName.trim()}
-            >
-              Add category
-            </Button>
-          </Stack>
-
-          <TextField
-            label="EAN"
-            value={form.ean}
-            onChange={(e) => update("ean", e.target.value)}
-          />
-
-          <TextField
-            label="Description"
-            multiline
-            minRows={3}
-            value={form.description}
-            onChange={(e) => update("description", e.target.value)}
-          />
-
-          <Divider />
-
-          <Stack spacing={1}>
-            <Typography variant="subtitle1">Images</Typography>
-
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="center">
-              <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateIcon />}>
-                Select files
-                <input hidden multiple type="file" accept="image/*" onChange={onSelectFiles} />
-              </Button>
-              <Button
-                variant="contained"
-                onClick={onUploadFiles}
-                disabled={uploading || selectedFiles.length === 0}
-              >
-                {uploading ? "Uploading…" : `Upload selected (${selectedFiles.length})`}
-              </Button>
-            </Stack>
-
-            {form.images.length > 0 ? (
-              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                {form.images.map((key) => (
-                  <Chip
-                    key={key}
-                    label={key}
-                    onDelete={() =>
-                      setForm((prev) => ({
-                        ...prev,
-                        images: prev.images.filter((k) => k !== key),
-                      }))
-                    }
-                  />
-                ))}
-              </Stack>
-            ) : (
-              <Typography color="text.secondary">No images uploaded yet.</Typography>
-            )}
-          </Stack>
-        </Stack>
-
-        <Box>
-          <Button
-            variant="contained"
-            startIcon={<SaveIcon />}
-            onClick={onSubmit}
-            disabled={!canSubmit || saving || uploading}
-          >
-            {saving ? "Saving…" : mode === "new" ? "Create product" : "Save changes"}
-          </Button>
-        </Box>
+        <ProductFormSubmit
+          mode={mode}
+          saving={saving}
+          uploading={uploading}
+          canSubmit={canSubmit}
+          onSubmit={onSubmit}
+        />
       </Stack>
 
       <Snackbar
