@@ -73,6 +73,9 @@
       "category": "Category",
       "ean": "EAN",
       "description": "Description",
+      "improveDescription": "Improve with AI",
+      "improvingDescription": "Improving description…",
+      "descriptionImproved": "Description improved",
       "images": "Images",
       "selectFiles": "Select files",
       "uploadSelected": "Upload selected ({{count}})",
@@ -104,6 +107,7 @@
     "saveProduct": "Failed to save product",
     "createCategory": "Failed to create category",
     "uploadImages": "Failed to upload images",
+    "improveDescription": "Failed to improve description",
     "deleteCategory": "Failed to delete category",
     "updateCategory": "Failed to update category",
     "createCategoryGeneric": "Failed to create category"

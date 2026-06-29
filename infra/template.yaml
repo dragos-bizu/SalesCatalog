@@ -77,6 +77,11 @@ Parameters:
     Type: String
     Description: Email address that receives cost budget alerts.
 
+  AiDescriptionModelId:
+    Type: String
+    Default: amazon.titan-text-express-v1
+    Description: AWS Bedrock foundation model id used to improve product descriptions.
+
 # ---------------------------------------------------------------------------
 # Globals — defaults applied to every SAM resource of the given type.
 # ---------------------------------------------------------------------------
@@ -813,6 +818,33 @@ Resources:
             Auth:
               Authorizer: CognitoJwtAuthorizer
 
+  SuggestProductDescriptionFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub salescatalog-${Environment}-suggestProductDescription
+      CodeUri: ../src/lambdas/suggestProductDescription/
+      Handler: handler.lambda_handler
+      Layers:
+        - !Ref SharedLayer
+      Environment:
+        Variables:
+          BEDROCK_MODEL_ID: !Ref AiDescriptionModelId
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: !Sub arn:${AWS::Partition}:bedrock:${AWS::Region}::foundation-model/${AiDescriptionModelId}
+      Events:
+        SuggestProductDescription:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /admin/products/description-suggest
+            Auth:
+              Authorizer: CognitoJwtAuthorizer
+
   # ----- Public: categories -------------------------------------------------
 
   ListCategoriesFunction:
@@ -970,6 +1002,12 @@ Resources:
       LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-listCategories
       RetentionInDays: 1
 
+  SuggestProductDescriptionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/salescatalog-${Environment}-suggestProductDescription
+      RetentionInDays: 1
+
   CreateCategoryLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -1082,6 +1120,7 @@ Resources:
                   [ ".",          ".",            ".",            "${UpdateProductFunction}" ],
                   [ ".",          ".",            ".",            "${DeleteProductFunction}" ],
                   [ ".",          ".",            ".",            "${CreateImageUploadUrlFunction}" ],
+                  [ ".",          ".",            ".",            "${SuggestProductDescriptionFunction}" ],
                   [ ".",          ".",            ".",            "${ListCategoriesFunction}" ],
                   [ ".",          ".",            ".",            "${CreateCategoryFunction}" ],
                   [ ".",          ".",            ".",            "${UpdateCategoryFunction}" ],

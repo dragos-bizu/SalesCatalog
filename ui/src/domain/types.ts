@@ -58,3 +58,16 @@ export interface ImageUpload {
   publicUrl: string;
   contentType: string;
 }
+
+/** Payload for AI-powered description enhancement. */
+export interface SuggestDescriptionInput {
+  seed: string;
+  productName?: string;
+  categoryName?: string;
+  language?: string;
+}
+
+/** Response for AI-powered description enhancement. */
+export interface SuggestDescriptionOutput {
+  description: string;
+}

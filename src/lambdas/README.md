@@ -28,6 +28,7 @@ Shared helpers from `src/shared/` are consumed through a **Lambda Layer** (attac
 | `updateProduct/`        | `PUT /products/{id}`                 | Update an existing product.                                  |
 | `deleteProduct/`        | `DELETE /products/{id}`              | Delete a product.                                            |
 | `createImageUploadUrl/` | `POST /admin/images/upload-url`      | Issue a short-lived presigned S3 PUT URL for image upload.   |
+| `suggestProductDescription/` | `POST /admin/products/description-suggest` | Improve a short draft into a polished product description via Bedrock. |
 | `createCategory/`       | `POST /categories`                   | Create a new category.                                       |
 | `updateCategory/`       | `PUT /categories/{id}`               | Update a category.                                           |
 | `deleteCategory/`       | `DELETE /categories/{id}`            | Delete a category.                                           |

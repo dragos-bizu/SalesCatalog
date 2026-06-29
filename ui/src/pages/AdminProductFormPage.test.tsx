@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { AdminProductFormPage } from "./AdminProductFormPage";
+import { api } from "../services/api";
 
 const navigateMock = jest.fn();
 
@@ -80,6 +81,9 @@ function renderEdit(id = "p1") {
 describe("AdminProductFormPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(api, "suggestProductDescription").mockResolvedValue({
+      description: "Polished AI description",
+    });
     categoryCreateMock.mockResolvedValue({ id: "c-new", name: "NewCat" });
     productFetchOneMock.mockResolvedValue({
       id: "p1",
@@ -171,5 +175,25 @@ describe("AdminProductFormPage", () => {
       expect(uploadImagesMock).toHaveBeenCalled();
     });
     expect(screen.getByAltText(/product image 1/i)).toBeInTheDocument();
+  });
+
+  it("improves description with AI button", async () => {
+    renderNew();
+
+    fireEvent.change(screen.getByLabelText(/description/i), {
+      target: { value: "fresh coffee beans with rich aroma and smooth body" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /improve with ai/i }));
+
+    await waitFor(() => {
+      expect(api.suggestProductDescription).toHaveBeenCalledWith(
+        expect.objectContaining({
+          seed: "fresh coffee beans with rich aroma and smooth body",
+          language: "en",
+        }),
+      );
+    });
+
+    expect(screen.getByDisplayValue("Polished AI description")).toBeInTheDocument();
   });
 });

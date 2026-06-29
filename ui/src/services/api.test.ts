@@ -102,4 +102,24 @@ describe("api service", () => {
       files: [{ contentType: "image/jpeg" }, { contentType: "image/png" }],
     });
   });
+
+  it("sends seed text for AI description suggestion", async () => {
+    const fetchMock = mockFetch(200, { description: "Improved" });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    setTokenProvider(() => "tok");
+
+    await api.suggestProductDescription({
+      seed: "fresh coffee beans with rich aroma and smooth body",
+      productName: "House Blend",
+    });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain("/admin/products/description-suggest");
+    expect(init.method).toBe("POST");
+    expect(init.headers["Authorization"]).toBe("Bearer tok");
+    expect(JSON.parse(init.body)).toEqual({
+      seed: "fresh coffee beans with rich aroma and smooth body",
+      productName: "House Blend",
+    });
+  });
 });

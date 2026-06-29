@@ -27,6 +27,8 @@ export interface ProductBasicFieldsProps {
   ) => void;
   onNewCategoryNameChange: (value: string) => void;
   onCreateCategory: () => void;
+  onImproveDescription: () => void;
+  improvingDescription: boolean;
 }
 
 /** Name/category/EAN/description section of the admin product form. */
@@ -38,6 +40,8 @@ export function ProductBasicFields({
   onFormChange,
   onNewCategoryNameChange,
   onCreateCategory,
+  onImproveDescription,
+  improvingDescription,
 }: ProductBasicFieldsProps) {
   const { t } = useTranslation();
 
@@ -95,6 +99,18 @@ export function ProductBasicFields({
         value={form.description}
         onChange={(e) => onFormChange("description", e.target.value)}
       />
+
+      <Stack direction="row" justifyContent="flex-end">
+        <Button
+          variant="outlined"
+          onClick={onImproveDescription}
+          disabled={improvingDescription || form.description.trim().length === 0}
+        >
+          {improvingDescription
+            ? t("products.form.improvingDescription")
+            : t("products.form.improveDescription")}
+        </Button>
+      </Stack>
     </Stack>
   );
 }

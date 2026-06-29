@@ -118,3 +118,10 @@ npm run test
 2. UI performs `fetch(uploadUrl, { method: 'PUT', body: file })` directly to S3.
 3. UI calls `POST /products` (or `PUT /products/{id}`) including the returned `key` in the `images` array.
 4. Public users see the image at `${VITE_IMAGES_BASE_URL}/${key}`.
+
+## AI description enhancement (admin)
+
+1. In product form, admin writes a short draft in the description field.
+2. UI calls `POST /admin/products/description-suggest` with the draft and optional product/category context.
+3. Backend uses AWS Bedrock to generate a polished description.
+4. UI replaces the description field with the generated text.

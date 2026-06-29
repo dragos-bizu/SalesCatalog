@@ -73,6 +73,9 @@
       "category": "Categorie",
       "ean": "EAN",
       "description": "Descriere",
+      "improveDescription": "Imbunatateste cu AI",
+      "improvingDescription": "Se imbunatateste descrierea...",
+      "descriptionImproved": "Descrierea a fost imbunatatita",
       "images": "Imagini",
       "selectFiles": "Selectare imagine",
       "uploadSelected": "Incarca imaginile ({{count}})",
@@ -104,6 +107,7 @@
     "saveProduct": "Eroare la salvarea produsului",
     "createCategory": "Eroare la crearea categoriei",
     "uploadImages": "Eroare la incarcatul imaginii",
+    "improveDescription": "Eroare la imbunatatirea descrierii",
     "deleteCategory": "Eroare la stergerea categoriei",
     "updateCategory": "Eroare la editarea categoriei",
     "createCategoryGeneric": "Eroare la crearea categoriei"

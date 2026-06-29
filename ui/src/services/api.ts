@@ -10,6 +10,8 @@ import type {
   ListProductsQuery,
   Product,
   ProductPage,
+  SuggestDescriptionInput,
+  SuggestDescriptionOutput,
   UpdateProductInput,
 } from "../domain/types";
 
@@ -149,6 +151,16 @@ export const api = {
     return request<{ uploads: ImageUpload[] }>("/admin/images/upload-url", {
       method: "POST",
       body: { files: contentTypes.map((contentType) => ({ contentType })) },
+      auth: true,
+    });
+  },
+
+  suggestProductDescription(
+    input: SuggestDescriptionInput,
+  ): Promise<SuggestDescriptionOutput> {
+    return request<SuggestDescriptionOutput>("/admin/products/description-suggest", {
+      method: "POST",
+      body: input,
       auth: true,
     });
   },

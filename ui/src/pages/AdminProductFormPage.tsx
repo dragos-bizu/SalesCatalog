@@ -17,6 +17,7 @@ import { ProductImagesSection } from "../components/admin/ProductImagesSection";
 import { useCategoryManager } from "../managers/CategoryManager";
 import { uploadImages } from "../managers/ImageManager";
 import { useProductManager } from "../managers/ProductManager";
+import { api } from "../services/api";
 
 const EMPTY_FORM: ProductFormState = {
   name: "",
@@ -38,7 +39,7 @@ const EMPTY_FORM: ProductFormState = {
  * - uploading product images (presigned URL flow)
  */
 export function AdminProductFormPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const mode = id ? "edit" : "new";
   const navigate = useNavigate();
@@ -64,6 +65,7 @@ export function AdminProductFormPage() {
   const [saving, setSaving] = useState(false);
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [improvingDescription, setImprovingDescription] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -205,6 +207,29 @@ export function AdminProductFormPage() {
     }
   }
 
+  async function onImproveDescription() {
+    const seed = form.description.trim();
+    if (!seed || improvingDescription) return;
+
+    setImprovingDescription(true);
+    setError(null);
+    try {
+      const selectedCategory = categories.find((c) => c.id === form.categoryId);
+      const { description } = await api.suggestProductDescription({
+        seed,
+        productName: form.name.trim() || undefined,
+        categoryName: selectedCategory?.name,
+        language: i18n.language || "en",
+      });
+      update("description", description);
+      setSuccess(t("products.form.descriptionImproved"));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("errors.improveDescription"));
+    } finally {
+      setImprovingDescription(false);
+    }
+  }
+
   if (loading) {
     return (
       <Paper sx={{ p: 3, textAlign: "center" }}>
@@ -229,6 +254,8 @@ export function AdminProductFormPage() {
           onFormChange={update}
           onNewCategoryNameChange={setNewCategoryName}
           onCreateCategory={onCreateCategory}
+          onImproveDescription={onImproveDescription}
+          improvingDescription={improvingDescription}
         />
 
         <ProductImagesSection
