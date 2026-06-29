@@ -13,6 +13,13 @@ import productsReducer from "../store/productsSlice";
 import categoriesReducer from "../store/categoriesSlice";
 import { Layout } from "../components/Layout";
 import { RequireAuth } from "../components/RequireAuth";
+
+// HomePage performs async data loading effects; route tests only verify path
+// wiring, so we stub it to keep this suite deterministic/noiseless.
+jest.mock("../pages/HomePage", () => ({
+  HomePage: () => <div>Home route</div>,
+}));
+
 import { HomePage } from "../pages/HomePage";
 import { ProductDetailPage } from "../pages/ProductDetailPage";
 import { LoginPage } from "../pages/LoginPage";
@@ -88,7 +95,7 @@ function renderAt(initial: string) {
 describe("router", () => {
   it("renders the home page at /", () => {
     renderAt("/");
-    expect(screen.getByText(/public catalog/i)).toBeInTheDocument();
+    expect(screen.getByText(/home route/i)).toBeInTheDocument();
   });
 
   it("renders the product detail page with the URL id", () => {
