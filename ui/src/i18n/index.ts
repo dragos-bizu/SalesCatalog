@@ -4,8 +4,8 @@ import commonEn from "./en/common.json";
 import commonRo from "./ro/common.json";
 
 void i18n.use(initReactI18next).init({
-  lng: "en",
-  fallbackLng: "en",
+  lng: "ro",
+  fallbackLng: ["ro", "en"],
   interpolation: { escapeValue: false },
   initImmediate: false,
   resources: {
