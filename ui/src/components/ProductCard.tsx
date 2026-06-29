@@ -2,7 +2,6 @@ import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import CardActionArea from "@mui/material/CardActionArea";
 import CardContent from "@mui/material/CardContent";
-import CardMedia from "@mui/material/CardMedia";
 import Typography from "@mui/material/Typography";
 import { Link as RouterLink } from "react-router-dom";
 import { config } from "../app/config";
@@ -32,7 +31,30 @@ export function ProductCard({ product }: ProductCardProps) {
     <Card>
       <CardActionArea component={RouterLink} to={`/products/${product.id}`}>
         {image ? (
-          <CardMedia component="img" height="180" image={image} alt={product.name} />
+          <Box
+            sx={{
+              height: 180,
+              bgcolor: "common.white",
+              borderBottom: 1,
+              borderColor: "divider",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              p: 1,
+            }}
+          >
+            <Box
+              component="img"
+              src={image}
+              alt={product.name}
+              sx={{
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+                display: "block",
+              }}
+            />
+          </Box>
         ) : (
           <Box
             sx={{
