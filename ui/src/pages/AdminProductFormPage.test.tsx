@@ -170,6 +170,6 @@ describe("AdminProductFormPage", () => {
     await waitFor(() => {
       expect(uploadImagesMock).toHaveBeenCalled();
     });
-    expect(screen.getByText("products/u1.jpg")).toBeInTheDocument();
+    expect(screen.getByAltText(/product image 1/i)).toBeInTheDocument();
   });
 });
