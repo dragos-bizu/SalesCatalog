@@ -1,0 +1,111 @@
+{
+  "app": {
+    "name": "Catalog Royal",
+    "footer": "Catalog Royal"
+  },
+  "nav": {
+    "admin": "Admin",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "back": "Inapoi"
+  },
+  "search": {
+    "label": "Cautare Produse",
+    "button": "Cautare"
+  },
+  "common": {
+    "loading": "Incarcare...",
+    "noImage": "Fara imagine",
+    "noDescription": "Fara descriere",
+    "save": "Salvare",
+    "cancel": "Cancel",
+    "delete": "Sterge",
+    "edit": "Editare",
+    "next": "Inainte",
+    "back": "Inapoi",
+    "loadMore": "Mai Mult",
+    "actions": "Actiuni"
+  },
+  "categories": {
+    "allProducts": "Toate Produsele",
+    "manageTitle": "Categorii",
+    "manageAction": "Administrare Categorii",
+    "newCategory": "Categorie Noua",
+    "addCategory": "Adaugare Categorie",
+    "createNewCategory": "Creare Categorie Noua",
+    "noCategories": "Nu sunt cateogrii.",
+    "deleteTitle": "Stergere categorie",
+    "deleteConfirm": "Esti sigur ca vrei sa stergi {{name}}?",
+    "deleteBlocked": "Nu se poate sterge categoria: inca are produse.",
+    "created": "Categoria '{{name}}' a fost creata",
+    "updated": "Categoria a fost modificata",
+    "deleted": "Categoria a fost stearsa"
+  },
+  "products": {
+    "title": "Produse",
+    "adminTitle": "Administrare Produse",
+    "browseHelp": "Cauta produse dupa categorie si cauta in categoria selectata.",
+    "noProducts": "Nu au fost gasite produse.",
+    "newProduct": "Produs nou",
+    "createProduct": "Creare produs",
+    "saveChanges": "Salvare schimbari",
+    "created": "Produsul a fost creat",
+    "updated": "Produsul a fost modificat",
+    "deleteTitle": "Produsul a fost sters",
+    "deleteConfirm": "Esti sigur ca vrei sa stergi {{name}}?",
+    "detailTitle": "Detaliile produsului",
+    "detailNotFound": "Produsul nu a fost gasit",
+    "detailMissingId": "ID-ul produsului nu a fost gasit",
+    "noData": "Nu exista date despre produs.",
+    "description": "Descriere",
+    "categoryChip": "Categoria: {{name}}",
+    "eanChip": "EAN: {{ean}}",
+    "imageAlt": "{{name}} imagine {{index}}",
+    "imageCarousel": {
+      "nextAria": "Imaginea Urmatoare",
+      "prevAria": "Imaginea Anterioara"
+    },
+    "loadingProduct": "Se incarca produsele…",
+    "form": {
+      "newTitle": "Produs nou",
+      "editTitle": "Editare produs",
+      "name": "Nume",
+      "category": "Categorie",
+      "ean": "EAN",
+      "description": "Descriere",
+      "images": "Imagini",
+      "selectFiles": "Selectare imagine",
+      "uploadSelected": "Incarca imaginile ({{count}})",
+      "uploading": "Incarcare...",
+      "noImages": "Nu au fost incarcate imagini.",
+      "imagesUploaded": "Imagini incarcate",
+      "saving": "Salvare...",
+      "preview": "Previzualizare",
+      "removeImageAria": "Sterge imaginea {{index}}"
+    }
+  },
+  "auth": {
+    "adminSignIn": "Admin sign in",
+    "signInHint": "Vei fi redirectionat pentru sign in.",
+    "signInWithCognito": "Sign in cu Cognito",
+    "completingSignIn": "Incarcare sign in…",
+    "missingParams": "Lipsesc 'code' sau 'state'",
+    "signInFailed": "Sign-in esuat: {{message}}",
+    "tryAgain": "Incearca din nou"
+  },
+  "notFound": {
+    "title": "Pagina nu a fost gasita",
+    "message": "Pagina cautata nu exista.",
+    "backHome": "Acasa"
+  },
+  "errors": {
+    "loadCategories": "Eroare la incarcarea categoriilor",
+    "loadProduct": "Eroare la incarcarea produsului",
+    "saveProduct": "Eroare la salvarea produsului",
+    "createCategory": "Eroare la crearea categoriei",
+    "uploadImages": "Eroare la incarcatul imaginii",
+    "deleteCategory": "Eroare la stergerea categoriei",
+    "updateCategory": "Eroare la editarea categoriei",
+    "createCategoryGeneric": "Eroare la crearea categoriei"
+  }
+}

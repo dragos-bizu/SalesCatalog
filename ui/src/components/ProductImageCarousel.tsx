@@ -6,6 +6,7 @@ import Fade from "@mui/material/Fade";
 import MobileStepper from "@mui/material/MobileStepper";
 import Typography from "@mui/material/Typography";
 import { type TouchEvent, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { config } from "../app/config";
 
 export interface ProductImageCarouselProps {
@@ -30,6 +31,7 @@ function toImageUrl(image: string): string | null {
  * - "No image" placeholder when no valid image URLs are available
  */
 export function ProductImageCarousel({ productName, images }: ProductImageCarouselProps) {
+  const { t } = useTranslation();
   const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   const touchStartX = useRef<number | null>(null);
@@ -87,7 +89,7 @@ export function ProductImageCarousel({ productName, images }: ProductImageCarous
           borderRadius: 1,
         }}
       >
-        <Typography>No image</Typography>
+        <Typography>{t("common.noImage")}</Typography>
       </Box>
     );
   }
@@ -98,7 +100,7 @@ export function ProductImageCarousel({ productName, images }: ProductImageCarous
         <Box
           component="img"
           src={activeImage}
-          alt={`${productName} image ${activeImageIndex + 1}`}
+          alt={t("products.imageAlt", { name: productName, index: activeImageIndex + 1 })}
           onTouchStart={(e: TouchEvent<HTMLImageElement>) =>
             onTouchStart(e.changedTouches[0].clientX)
           }
@@ -129,9 +131,9 @@ export function ProductImageCarousel({ productName, images }: ProductImageCarous
               size="small"
               onClick={() => setActiveImageIndex((i) => i + 1)}
               disabled={!canGoNext}
-              aria-label="Next image"
+              aria-label={t("products.imageCarousel.nextAria", "Next image")}
             >
-              Next
+              {t("common.next")}
               <KeyboardArrowRightIcon />
             </Button>
           }
@@ -140,10 +142,10 @@ export function ProductImageCarousel({ productName, images }: ProductImageCarous
               size="small"
               onClick={() => setActiveImageIndex((i) => i - 1)}
               disabled={!canGoPrev}
-              aria-label="Previous image"
+              aria-label={t("products.imageCarousel.prevAria", "Previous image")}
             >
               <KeyboardArrowLeftIcon />
-              Back
+              {t("common.back")}
             </Button>
           }
         />

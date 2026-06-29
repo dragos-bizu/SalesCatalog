@@ -2,6 +2,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
+import { useTranslation } from "react-i18next";
 
 export interface SearchBarProps {
   value: string;
@@ -17,12 +18,13 @@ export interface SearchBarProps {
  * Search (or presses Enter in the field).
  */
 export function SearchBar({ value, onChange, onSearch, disabled }: SearchBarProps) {
+  const { t } = useTranslation();
   return (
     <Box sx={{ display: "flex", gap: 1, alignItems: "center", mb: 2 }}>
       <TextField
         fullWidth
         size="small"
-        label="Search products"
+        label={t("search.label")}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
@@ -38,7 +40,7 @@ export function SearchBar({ value, onChange, onSearch, disabled }: SearchBarProp
         onClick={onSearch}
         disabled={disabled}
       >
-        Search
+        {t("search.button")}
       </Button>
     </Box>
   );

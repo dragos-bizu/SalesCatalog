@@ -5,6 +5,7 @@ import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { CategoryTabs } from "../components/CategoryTabs";
 import { ProductGrid } from "../components/ProductGrid";
 import { SearchBar } from "../components/SearchBar";
@@ -21,6 +22,7 @@ import { useProductManager } from "../managers/ProductManager";
  * - Error notifications in a top snackbar
  */
 export function HomePage() {
+  const { t } = useTranslation();
   const categoryManager = useCategoryManager();
   const productManager = useProductManager();
 
@@ -74,10 +76,10 @@ export function HomePage() {
   return (
     <Box>
       <Typography variant="h4" sx={{ mb: 1 }}>
-        Products
+        {t("products.title")}
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 2 }}>
-        Browse products by category and search within the selected category.
+        {t("products.browseHelp")}
       </Typography>
 
       <SearchBar
@@ -102,7 +104,7 @@ export function HomePage() {
             onClick={() => loadMore(query)}
             disabled={productsLoading}
           >
-            Load more
+            {t("common.loadMore")}
           </Button>
         </Stack>
       )}

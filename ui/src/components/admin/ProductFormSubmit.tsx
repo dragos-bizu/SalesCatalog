@@ -1,6 +1,7 @@
 import SaveIcon from "@mui/icons-material/Save";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import { useTranslation } from "react-i18next";
 
 export interface ProductFormSubmitProps {
   mode: "new" | "edit";
@@ -18,6 +19,8 @@ export function ProductFormSubmit({
   canSubmit,
   onSubmit,
 }: ProductFormSubmitProps) {
+  const { t } = useTranslation();
+
   return (
     <Box>
       <Button
@@ -26,7 +29,11 @@ export function ProductFormSubmit({
         onClick={onSubmit}
         disabled={!canSubmit || saving || uploading}
       >
-        {saving ? "Saving…" : mode === "new" ? "Create product" : "Save changes"}
+        {saving
+          ? t("products.form.saving", "Saving…")
+          : mode === "new"
+            ? t("products.createProduct")
+            : t("products.saveChanges")}
       </Button>
     </Box>
   );

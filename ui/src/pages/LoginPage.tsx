@@ -1,9 +1,10 @@
-import { useEffect } from "react";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuthManager } from "../managers/AuthManager";
 
@@ -19,6 +20,7 @@ interface LocationState {
  * that starts the Cognito Hosted UI flow.
  */
 export function LoginPage() {
+  const { t } = useTranslation();
   const location = useLocation();
   const { isAuthenticated, signIn } = useAuthManager();
   const returnTo = (location.state as LocationState | null)?.from ?? "/admin";
@@ -36,16 +38,14 @@ export function LoginPage() {
   return (
     <Paper sx={{ p: 4, maxWidth: 420, mx: "auto" }}>
       <Stack spacing={2} alignItems="stretch">
-        <Typography variant="h5">Admin sign in</Typography>
-        <Typography color="text.secondary">
-          You will be redirected to the Cognito Hosted UI to sign in.
-        </Typography>
+        <Typography variant="h5">{t("auth.adminSignIn")}</Typography>
+        <Typography color="text.secondary">{t("auth.signInHint")}</Typography>
         <Button
           variant="contained"
           size="large"
           onClick={() => signIn(returnTo)}
         >
-          Sign in
+          {t("nav.signIn")}
         </Button>
         <Stack
           direction="row"

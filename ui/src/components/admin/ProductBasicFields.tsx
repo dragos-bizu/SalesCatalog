@@ -5,6 +5,7 @@ import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
+import { useTranslation } from "react-i18next";
 import type { Category } from "../../domain/types";
 
 export interface ProductFormState {
@@ -38,20 +39,22 @@ export function ProductBasicFields({
   onNewCategoryNameChange,
   onCreateCategory,
 }: ProductBasicFieldsProps) {
+  const { t } = useTranslation();
+
   return (
     <Stack spacing={2}>
       <TextField
-        label="Name"
+        label={t("products.form.name")}
         required
         value={form.name}
         onChange={(e) => onFormChange("name", e.target.value)}
       />
 
       <FormControl fullWidth required>
-        <InputLabel id="category-label">Category</InputLabel>
+        <InputLabel id="category-label">{t("products.form.category")}</InputLabel>
         <Select
           labelId="category-label"
-          label="Category"
+          label={t("products.form.category")}
           value={form.categoryId}
           onChange={(e) => onFormChange("categoryId", e.target.value)}
         >
@@ -66,7 +69,7 @@ export function ProductBasicFields({
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
         <TextField
           fullWidth
-          label="Create new category"
+          label={t("categories.createNewCategory")}
           value={newCategoryName}
           onChange={(e) => onNewCategoryNameChange(e.target.value)}
         />
@@ -75,18 +78,18 @@ export function ProductBasicFields({
           onClick={onCreateCategory}
           disabled={creatingCategory || !newCategoryName.trim()}
         >
-          Add category
+          {t("categories.addCategory")}
         </Button>
       </Stack>
 
       <TextField
-        label="EAN"
+        label={t("products.form.ean")}
         value={form.ean}
         onChange={(e) => onFormChange("ean", e.target.value)}
       />
 
       <TextField
-        label="Description"
+        label={t("products.form.description")}
         multiline
         minRows={3}
         value={form.description}

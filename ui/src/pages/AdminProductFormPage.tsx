@@ -5,6 +5,7 @@ import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ProductBasicFields,
@@ -37,6 +38,7 @@ const EMPTY_FORM: ProductFormState = {
  * - uploading product images (presigned URL flow)
  */
 export function AdminProductFormPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const mode = id ? "edit" : "new";
   const navigate = useNavigate();
@@ -70,7 +72,7 @@ export function AdminProductFormPage() {
 
   useEffect(() => {
     void ensureCategoriesLoaded().catch((e: unknown) => {
-      setError(e instanceof Error ? e.message : "Failed to load categories");
+      setError(e instanceof Error ? e.message : t("errors.loadCategories"));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -98,14 +100,14 @@ export function AdminProductFormPage() {
       })
       .catch((e: unknown) => {
         if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Failed to load product");
+        setError(e instanceof Error ? e.message : t("errors.loadProduct"));
         setLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [id, fetchOne]);
+  }, [id, fetchOne, t]);
 
   const canSubmit = useMemo(
     () => form.name.trim().length > 0 && form.categoryId.trim().length > 0,
@@ -135,16 +137,16 @@ export function AdminProductFormPage() {
 
       if (mode === "new") {
         await createProduct(payload);
-        setSuccess("Product created");
+        setSuccess(t("products.created"));
       } else if (id) {
         await updateProduct(id, payload);
-        setSuccess("Product updated");
+        setSuccess(t("products.updated"));
       }
 
       // Navigate back to the admin list after a short visual confirmation.
       setTimeout(() => navigate("/admin"), 250);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to save product");
+      setError(e instanceof Error ? e.message : t("errors.saveProduct"));
     } finally {
       setSaving(false);
     }
@@ -160,9 +162,9 @@ export function AdminProductFormPage() {
       const created = await createCategory({ name });
       setNewCategoryName("");
       update("categoryId", created.id);
-      setSuccess(`Category '${created.name}' created`);
+      setSuccess(t("categories.created", { name: created.name }));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to create category");
+      setError(e instanceof Error ? e.message : t("errors.createCategory"));
     } finally {
       setCreatingCategory(false);
     }
@@ -195,9 +197,9 @@ export function AdminProductFormPage() {
         images: [...prev.images, ...uploadedKeys],
       }));
       setSelectedFiles([]);
-      setSuccess("Images uploaded");
+      setSuccess(t("products.form.imagesUploaded"));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to upload images");
+      setError(e instanceof Error ? e.message : t("errors.uploadImages"));
     } finally {
       setUploading(false);
     }
@@ -208,7 +210,7 @@ export function AdminProductFormPage() {
       <Paper sx={{ p: 3, textAlign: "center" }}>
         <CircularProgress size={24} />
         <Typography color="text.secondary" sx={{ mt: 1 }}>
-          Loading product…
+          {t("products.loadingProduct")}
         </Typography>
       </Paper>
     );

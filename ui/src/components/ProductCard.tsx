@@ -3,6 +3,7 @@ import Card from "@mui/material/Card";
 import CardActionArea from "@mui/material/CardActionArea";
 import CardContent from "@mui/material/CardContent";
 import Typography from "@mui/material/Typography";
+import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
 import { config } from "../app/config";
 import type { Product } from "../domain/types";
@@ -26,6 +27,7 @@ export interface ProductCardProps {
  * Single-responsibility product card used in product grids.
  */
 export function ProductCard({ product }: ProductCardProps) {
+  const { t } = useTranslation();
   const image = product.images[0] ? toImageUrl(product.images[0]) : null;
   return (
     <Card>
@@ -68,7 +70,7 @@ export function ProductCard({ product }: ProductCardProps) {
               borderColor: "divider",
             }}
           >
-            <Typography variant="body2">No image</Typography>
+            <Typography variant="body2">{t("common.noImage")}</Typography>
           </Box>
         )}
         <CardContent>
@@ -76,7 +78,7 @@ export function ProductCard({ product }: ProductCardProps) {
             {product.name}
           </Typography>
           <Typography variant="body2" color="text.secondary" noWrap>
-            {product.description || "No description"}
+            {product.description || t("common.noDescription")}
           </Typography>
         </CardContent>
       </CardActionArea>

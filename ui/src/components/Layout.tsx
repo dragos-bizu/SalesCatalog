@@ -6,6 +6,7 @@ import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import { Link as RouterLink, Outlet } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuthManager } from "../managers/AuthManager";
 
 /**
@@ -13,6 +14,7 @@ import { useAuthManager } from "../managers/AuthManager";
  * content container. Individual pages render inside <Outlet />.
  */
 export function Layout() {
+  const { t } = useTranslation();
   const { isAuthenticated, email, signOut } = useAuthManager();
 
   return (
@@ -26,12 +28,12 @@ export function Layout() {
             startIcon={<StorefrontIcon />}
             sx={{ textTransform: "none", fontSize: "1.1rem", mr: "auto" }}
           >
-            SalesCatalog
+            {t("app.name")}
           </Button>
           {isAuthenticated ? (
             <>
               <Button component={RouterLink} to="/admin" color="inherit">
-                Admin
+                {t("nav.admin")}
               </Button>
               {email && (
                 <Typography
@@ -43,12 +45,12 @@ export function Layout() {
                 </Typography>
               )}
               <Button color="inherit" onClick={signOut}>
-                Sign out
+                {t("nav.signOut")}
               </Button>
             </>
           ) : (
             <Button component={RouterLink} to="/login" color="inherit">
-              Sign in
+              {t("nav.signIn")}
             </Button>
           )}
         </Toolbar>
@@ -62,7 +64,7 @@ export function Layout() {
         component="footer"
         sx={{ py: 2, textAlign: "center", color: "text.secondary" }}
       >
-        <Typography variant="body2">SalesCatalog</Typography>
+        <Typography variant="body2">{t("app.footer")}</Typography>
       </Box>
     </Box>
   );

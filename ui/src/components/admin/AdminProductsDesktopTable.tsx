@@ -9,6 +9,7 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
+import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
 import type { Product } from "../../domain/types";
 
@@ -26,15 +27,17 @@ export function AdminProductsDesktopTable({
   categoryMap,
   onDelete,
 }: AdminProductsDesktopTableProps) {
+  const { t } = useTranslation();
+
   return (
     <TableContainer>
       <Table size="small" aria-label="admin products table" sx={{ minWidth: 680 }}>
         <TableHead>
           <TableRow>
-            <TableCell>Name</TableCell>
-            <TableCell>Category</TableCell>
-            <TableCell>EAN</TableCell>
-            <TableCell align="right">Actions</TableCell>
+            <TableCell>{t("products.form.name")}</TableCell>
+            <TableCell>{t("products.form.category")}</TableCell>
+            <TableCell>{t("products.form.ean")}</TableCell>
+            <TableCell align="right">{t("common.actions", "Actions")}</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -51,7 +54,7 @@ export function AdminProductsDesktopTable({
                     size="small"
                     startIcon={<EditOutlinedIcon fontSize="small" />}
                   >
-                    Edit
+                    {t("common.edit")}
                   </Button>
                   <Button
                     color="error"
@@ -59,7 +62,7 @@ export function AdminProductsDesktopTable({
                     startIcon={<DeleteOutlineIcon fontSize="small" />}
                     onClick={() => onDelete(p)}
                   >
-                    Delete
+                    {t("common.delete")}
                   </Button>
                 </Stack>
               </TableCell>
@@ -69,7 +72,7 @@ export function AdminProductsDesktopTable({
           {!loading && products.length === 0 && (
             <TableRow>
               <TableCell colSpan={4} align="center">
-                <Typography color="text.secondary">No products found.</Typography>
+                <Typography color="text.secondary">{t("products.noProducts")}</Typography>
               </TableCell>
             </TableRow>
           )}
@@ -77,7 +80,7 @@ export function AdminProductsDesktopTable({
           {loading && (
             <TableRow>
               <TableCell colSpan={4} align="center">
-                <Typography color="text.secondary">Loading...</Typography>
+                <Typography color="text.secondary">{t("common.loading")}</Typography>
               </TableCell>
             </TableRow>
           )}

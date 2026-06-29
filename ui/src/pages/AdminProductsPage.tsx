@@ -14,6 +14,7 @@ import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
 import { CategoryTabs } from "../components/CategoryTabs";
 import { SearchBar } from "../components/SearchBar";
@@ -30,6 +31,7 @@ import { useProductManager } from "../managers/ProductManager";
  * actions, and cursor-based pagination.
  */
 export function AdminProductsPage() {
+  const { t } = useTranslation();
   const categoryManager = useCategoryManager();
   const productManager = useProductManager();
 
@@ -108,10 +110,10 @@ export function AdminProductsPage() {
         spacing={1.5}
         sx={{ mb: 2 }}
       >
-        <Typography variant="h4">Products (admin)</Typography>
+        <Typography variant="h4">{t("products.adminTitle")}</Typography>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
           <Button component={RouterLink} to="/admin/categories" size={isMobile ? "small" : "medium"}>
-            Manage categories
+            {t("categories.manageAction", "Manage categories")}
           </Button>
           <Button
             component={RouterLink}
@@ -120,7 +122,7 @@ export function AdminProductsPage() {
             startIcon={<AddIcon />}
             size={isMobile ? "small" : "medium"}
           >
-            New product
+            {t("products.newProduct")}
           </Button>
         </Stack>
       </Stack>
@@ -161,25 +163,26 @@ export function AdminProductsPage() {
             onClick={() => loadMore(query)}
             disabled={productsLoading}
           >
-            Load more
+            {t("common.loadMore")}
           </Button>
         </Box>
       )}
 
       <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)}>
-        <DialogTitle>Delete product</DialogTitle>
+        <DialogTitle>{t("products.deleteTitle")}</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete{" "}
-            <strong>{deleteTarget?.name ?? "this product"}</strong>?
+            {t("products.deleteConfirm", {
+              name: deleteTarget?.name ?? t("products.newProduct"),
+            })}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteTarget(null)} disabled={deleting}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button color="error" onClick={confirmDelete} disabled={deleting}>
-            Delete
+            {t("common.delete")}
           </Button>
         </DialogActions>
       </Dialog>

@@ -7,6 +7,7 @@ import CardContent from "@mui/material/CardContent";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
 import type { Product } from "../../domain/types";
 
@@ -26,6 +27,8 @@ export function AdminProductsMobileList({
   categoryMap,
   onDelete,
 }: AdminProductsMobileListProps) {
+  const { t } = useTranslation();
+
   return (
     <Stack spacing={1.25}>
       {products.map((p) => (
@@ -35,10 +38,10 @@ export function AdminProductsMobileList({
               {p.name}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Category: {categoryMap.get(p.categoryId) ?? p.categoryId}
+              {t("products.categoryChip", { name: categoryMap.get(p.categoryId) ?? p.categoryId })}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              EAN: {p.ean || "-"}
+              {t("products.eanChip", { ean: p.ean || "-" })}
             </Typography>
           </CardContent>
           <CardActions sx={{ px: 2, pb: 1.5, pt: 0, gap: 1 }}>
@@ -50,7 +53,7 @@ export function AdminProductsMobileList({
               startIcon={<EditOutlinedIcon fontSize="small" />}
               sx={{ flex: 1 }}
             >
-              Edit
+              {t("common.edit")}
             </Button>
             <Button
               color="error"
@@ -60,7 +63,7 @@ export function AdminProductsMobileList({
               onClick={() => onDelete(p)}
               sx={{ flex: 1 }}
             >
-              Delete
+              {t("common.delete")}
             </Button>
           </CardActions>
         </Card>
@@ -68,13 +71,13 @@ export function AdminProductsMobileList({
 
       {!loading && products.length === 0 && (
         <Paper variant="outlined" sx={{ p: 2, textAlign: "center" }}>
-          <Typography color="text.secondary">No products found.</Typography>
+          <Typography color="text.secondary">{t("products.noProducts")}</Typography>
         </Paper>
       )}
 
       {loading && (
         <Paper variant="outlined" sx={{ p: 2, textAlign: "center" }}>
-          <Typography color="text.secondary">Loading...</Typography>
+          <Typography color="text.secondary">{t("common.loading")}</Typography>
         </Paper>
       )}
     </Stack>

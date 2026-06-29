@@ -1,5 +1,6 @@
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
+import { useTranslation } from "react-i18next";
 import type { Category } from "../domain/types";
 
 export interface CategoryTabsProps {
@@ -17,6 +18,7 @@ export function CategoryTabs({
   selectedCategoryId,
   onChange,
 }: CategoryTabsProps) {
+  const { t } = useTranslation();
   return (
     <Tabs
       value={selectedCategoryId ?? "all"}
@@ -25,7 +27,7 @@ export function CategoryTabs({
       allowScrollButtonsMobile
       sx={{ mb: 2 }}
     >
-      <Tab label="All products" value="all" />
+      <Tab label={t("categories.allProducts")} value="all" />
       {categories.map((c) => (
         <Tab key={c.id} label={c.name} value={c.id} />
       ))}
