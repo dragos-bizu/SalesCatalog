@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from aws_lambda_powertools import Logger
 from boto3.dynamodb.conditions import Attr
 
-from salescatalog_shared import db, http
+from salescatalog_shared import auth, db, http
 
 logger = Logger()
 
@@ -54,6 +54,13 @@ def _name_taken_by_other(table, name_lower: str, current_id: str) -> bool:
 @logger.inject_lambda_context(log_event=False)
 def lambda_handler(event, context):
     """Entry point for the updateCategory Lambda."""
+    try:
+        auth.require_admin(event)
+    except auth.UnauthorizedError as exc:
+        return http.error(401, str(exc))
+    except auth.ForbiddenError as exc:
+        return http.error(403, str(exc))
+
     category_id = (event.get("pathParameters") or {}).get("id")
     if not category_id:
         return http.error(400, "Missing category id")

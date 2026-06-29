@@ -49,8 +49,8 @@ The project is built as a fully serverless application on AWS, kept within the F
 **Auth model:**
 
 - Public endpoints (`GET /products`, `GET /products/{id}`, `GET /categories`) are **unauthenticated**.
-- Admin endpoints (`POST`, `PUT`, `DELETE`, and presigned upload URLs) require a valid Cognito JWT.
-- All users in the Cognito User Pool are admins by definition — there is no public sign-up.
+- Admin endpoints (`POST`, `PUT`, `DELETE`, presigned upload URLs, and AI description suggestion) require a valid Cognito JWT.
+- Admin authorization is enforced by Cognito group membership (`admins` by default). There is no public sign-up.
 
 ---
 

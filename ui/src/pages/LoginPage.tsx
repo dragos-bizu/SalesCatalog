@@ -22,7 +22,7 @@ interface LocationState {
 export function LoginPage() {
   const { t } = useTranslation();
   const location = useLocation();
-  const { isAuthenticated, signIn } = useAuthManager();
+  const { isAuthenticated, isAdmin, signIn, signOut } = useAuthManager();
   const returnTo = (location.state as LocationState | null)?.from ?? "/admin";
 
   // Optional: auto-start the flow. Disabled by default to leave the user a
@@ -31,8 +31,23 @@ export function LoginPage() {
     /* no auto-redirect */
   }, []);
 
-  if (isAuthenticated) {
+  if (isAuthenticated && isAdmin) {
     return <Navigate to={returnTo} replace />;
+  }
+
+  if (isAuthenticated && !isAdmin) {
+    return (
+      <Paper sx={{ p: 4, maxWidth: 480, mx: "auto" }}>
+        <Stack spacing={2}>
+          <Typography variant="h6">
+            {t("auth.notInAdminGroup", "You are signed in but not authorized for admin access.")}
+          </Typography>
+          <Button variant="outlined" onClick={signOut}>
+            {t("nav.signOut")}
+          </Button>
+        </Stack>
+      </Paper>
+    );
   }
 
   return (

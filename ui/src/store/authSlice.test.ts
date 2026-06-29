@@ -1,14 +1,16 @@
 import reducer, {
   selectEmail,
   selectIdToken,
+  selectIsAdmin,
   selectIsAuthenticated,
   signedOut,
   tokensSet,
 } from "./authSlice";
 import type { RootState } from "./store";
 
-// Header.payload.signature with payload = base64url({ "email": "a@b.com" }).
-const FAKE_ID_TOKEN = "h." + btoa('{"email":"a@b.com"}') + ".s";
+// Header.payload.signature with payload = base64url(claims)
+const FAKE_ID_TOKEN =
+  "h." + btoa('{"email":"a@b.com","cognito:groups":["admins"]}') + ".s";
 
 describe("authSlice", () => {
   beforeEach(() => localStorage.clear());
@@ -34,6 +36,7 @@ describe("authSlice", () => {
     expect(state.refreshToken).toBe("rtk");
     expect(state.expiresAt).toBe(expiresAt);
     expect(state.email).toBe("a@b.com");
+    expect(state.groups).toEqual(["admins"]);
   });
 
   it("preserves the previous refresh token on a silent refresh", () => {
@@ -73,6 +76,7 @@ describe("authSlice", () => {
     expect(cleared.idToken).toBeNull();
     expect(cleared.refreshToken).toBeNull();
     expect(cleared.email).toBeNull();
+    expect(cleared.groups).toEqual([]);
   });
 
   describe("selectors", () => {
@@ -84,6 +88,7 @@ describe("authSlice", () => {
           refreshToken: null,
           expiresAt: null,
           email: null,
+          groups: [],
           ...auth,
         },
       } as RootState;
@@ -107,6 +112,28 @@ describe("authSlice", () => {
       const s = makeState({ idToken: "tk", email: "a@b.com" });
       expect(selectIdToken(s)).toBe("tk");
       expect(selectEmail(s)).toBe("a@b.com");
+    });
+
+    it("selectIsAdmin requires auth + configured admin group", () => {
+      expect(selectIsAdmin(makeState({}))).toBe(false);
+      expect(
+        selectIsAdmin(
+          makeState({
+            idToken: "tk",
+            expiresAt: Date.now() + 10_000,
+            groups: ["users"],
+          }),
+        ),
+      ).toBe(false);
+      expect(
+        selectIsAdmin(
+          makeState({
+            idToken: "tk",
+            expiresAt: Date.now() + 10_000,
+            groups: ["admins"],
+          }),
+        ),
+      ).toBe(true);
     });
   });
 });

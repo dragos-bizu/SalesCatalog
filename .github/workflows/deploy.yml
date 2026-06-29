@@ -32,6 +32,7 @@ jobs:
       user_pool_id: ${{ steps.outputs.outputs.user_pool_id }}
       user_pool_client_id: ${{ steps.outputs.outputs.user_pool_client_id }}
       hosted_ui_base_url: ${{ steps.outputs.outputs.hosted_ui_base_url }}
+      admin_group_name: ${{ steps.outputs.outputs.admin_group_name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -94,6 +95,7 @@ jobs:
             echo "user_pool_id=$(get UserPoolId)"
             echo "user_pool_client_id=$(get UserPoolClientId)"
             echo "hosted_ui_base_url=$(get HostedUiBaseUrl)"
+            echo "admin_group_name=$(get AdminGroupName)"
           } >> "$GITHUB_OUTPUT"
 
   # -------------------------------------------------------------------------
@@ -148,6 +150,7 @@ jobs:
           VITE_COGNITO_CLIENT_ID: ${{ needs.deploy-backend.outputs.user_pool_client_id }}
           VITE_COGNITO_REDIRECT_URI: https://${{ secrets.DOMAIN_NAME }}/auth/callback
           VITE_COGNITO_LOGOUT_URI: https://${{ secrets.DOMAIN_NAME }}/
+          VITE_ADMIN_GROUP: ${{ needs.deploy-backend.outputs.admin_group_name }}
         run: npm run build
 
       - name: Sync to S3

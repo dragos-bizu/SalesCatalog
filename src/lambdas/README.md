@@ -20,7 +20,7 @@ Shared helpers from `src/shared/` are consumed through a **Lambda Layer** (attac
 | `getProduct/`     | `GET /products/{id}`    | Get a single product by id.                  |
 | `listCategories/` | `GET /categories`       | List all categories.                         |
 
-### Admin (Cognito JWT required)
+### Admin (Cognito JWT + admin group required)
 
 | Folder                  | Method & route                       | Description                                                  |
 | ----------------------- | ------------------------------------ | ------------------------------------------------------------ |

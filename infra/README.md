@@ -31,7 +31,8 @@ The template provisions, in `us-east-1`:
   - `A` (alias) records for the UI domain and the images subdomain in the provided hosted zone.
 - **API Gateway (HTTP API)**
   - Public routes: `GET /products`, `GET /products/{id}`, `GET /categories`.
-  - Admin routes (Cognito JWT authorizer): all `POST`, `PUT`, `DELETE`, and `POST /admin/images/upload-url`.
+  - Admin routes (Cognito JWT authorizer): all `POST`, `PUT`, `DELETE`, `POST /admin/images/upload-url`, and `POST /admin/products/description-suggest`.
+  - Lambda-level admin authorization: user must belong to Cognito group `admins` (configurable via `AdminGroupName`).
 - **Lambda functions** — one per use case under `src/lambdas/`, each with its own minimal IAM role.
 - **Lambda Layer** — packages `src/shared/` and is attached to the Lambdas that need it.
 
@@ -44,6 +45,8 @@ The template provisions, in `us-east-1`:
 | `GoogleClientId`     | Google OAuth 2.0 Client ID.                                  |
 | `GoogleClientSecret` | Google OAuth 2.0 Client Secret (`NoEcho`).                   |
 | `Environment`        | Environment tag (e.g. `dev`, `prod`).                        |
+| `AdminGroupName`     | Cognito group required for admin Lambda authorization.       |
+| `AiDescriptionModelId` | Bedrock model id for AI description suggestion endpoint.    |
 
 ## Common commands
 
