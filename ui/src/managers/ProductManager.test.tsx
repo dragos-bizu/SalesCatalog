@@ -53,7 +53,7 @@ describe("useProductManager", () => {
     expect(result.current.items).toHaveLength(1);
   });
 
-  it("refetches when the active filter changes", async () => {
+  it("reuses cached category results when switching back", async () => {
     mockApi.listProducts
       .mockResolvedValueOnce({ items: [prod("p1", "Apple", "c1")], nextCursor: null })
       .mockResolvedValueOnce({ items: [prod("p2", "Carrot", "c2")], nextCursor: null });
@@ -69,8 +69,12 @@ describe("useProductManager", () => {
     await act(async () => {
       await result.current.ensureLoaded({ categoryId: "c2" });
     });
+    await act(async () => {
+      await result.current.ensureLoaded({ categoryId: "c1" });
+    });
+
     expect(mockApi.listProducts).toHaveBeenCalledTimes(2);
-    expect(result.current.items[0].categoryId).toBe("c2");
+    expect(result.current.items[0].categoryId).toBe("c1");
   });
 
   it("loadMore appends when nextCursor is set, no-ops otherwise", async () => {

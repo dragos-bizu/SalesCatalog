@@ -3,9 +3,9 @@
 // Cache-aware orchestrator for products. Handles paginated listing with
 // filters (categoryId, q) and post-mutation cache updates.
 //
-// Caching rule: a refetch is triggered when the requested filters differ
-// from what is currently cached, or when the cache is empty, or when the
-// caller explicitly forces a refresh. Otherwise the cached page is reused.
+// Caching rule: a refetch is triggered when the requested filters are not in
+// the cache, when forced, or when the cache is empty. Otherwise cached data is
+// promoted to the active view without a network call.
 
 import { useCallback } from "react";
 import { useAppDispatch, useAppSelector } from "../hooks/redux";
@@ -13,7 +13,9 @@ import { api } from "../services/api";
 import {
   fetchProducts,
   productRemoved,
+  productsCacheActivated,
   productUpserted,
+  toProductsQueryKey,
 } from "../store/productsSlice";
 import type {
   CreateProductInput,
@@ -62,8 +64,20 @@ export function useProductManager(): UseProductManager {
       { force = false }: { force?: boolean } = {},
     ) => {
       if (state.loading) return;
+
+      const key = toProductsQueryKey(query);
+      const cached = state.cacheByQuery[key];
+
+      if (!force && cached?.loaded) {
+        if (!filtersMatch(state, query) || !state.loaded) {
+          dispatch(productsCacheActivated(query));
+        }
+        return;
+      }
+
       const matches = filtersMatch(state, query);
-      if (state.loaded && matches && !force) return;
+      if (!force && state.loaded && matches) return;
+
       await dispatch(fetchProducts(query)).unwrap();
     },
     [dispatch, state],
@@ -71,12 +85,22 @@ export function useProductManager(): UseProductManager {
 
   const loadMore = useCallback(
     async (query: ListProductsQuery = {}) => {
-      if (state.loading || !state.nextCursor) return;
-      await dispatch(
-        fetchProducts({ ...query, cursor: state.nextCursor, append: true }),
-      ).unwrap();
+      if (state.loading) return;
+
+      const key = toProductsQueryKey(query);
+      const cached = state.cacheByQuery[key];
+      const cursor =
+        cached?.nextCursor ?? (filtersMatch(state, query) ? state.nextCursor : null);
+
+      if (!cursor) return;
+
+      if (cached?.loaded && !filtersMatch(state, query)) {
+        dispatch(productsCacheActivated(query));
+      }
+
+      await dispatch(fetchProducts({ ...query, cursor, append: true })).unwrap();
     },
-    [dispatch, state.loading, state.nextCursor],
+    [dispatch, state],
   );
 
   const getById = useCallback(
