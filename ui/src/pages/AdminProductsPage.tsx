@@ -4,6 +4,9 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Card from "@mui/material/Card";
+import CardActions from "@mui/material/CardActions";
+import CardContent from "@mui/material/CardContent";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
@@ -17,7 +20,10 @@ import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
+import TableContainer from "@mui/material/TableContainer";
 import Typography from "@mui/material/Typography";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { useTheme } from "@mui/material/styles";
 import { useEffect, useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { CategoryTabs } from "../components/CategoryTabs";
@@ -51,6 +57,9 @@ export function AdminProductsPage() {
     loadMore,
     remove,
   } = productManager;
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
@@ -102,14 +111,15 @@ export function AdminProductsPage() {
   return (
     <Paper sx={{ p: 3 }}>
       <Stack
-        direction="row"
+        direction={{ xs: "column", sm: "row" }}
         justifyContent="space-between"
-        alignItems="center"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={1.5}
         sx={{ mb: 2 }}
       >
         <Typography variant="h4">Products (admin)</Typography>
-        <Stack direction="row" spacing={1}>
-          <Button component={RouterLink} to="/admin/categories">
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+          <Button component={RouterLink} to="/admin/categories" size={isMobile ? "small" : "medium"}>
             Manage categories
           </Button>
           <Button
@@ -117,6 +127,7 @@ export function AdminProductsPage() {
             to="/admin/products/new"
             variant="contained"
             startIcon={<AddIcon />}
+            size={isMobile ? "small" : "medium"}
           >
             New product
           </Button>
@@ -136,61 +147,117 @@ export function AdminProductsPage() {
         onChange={setSelectedCategoryId}
       />
 
-      <Table size="small" aria-label="admin products table">
-        <TableHead>
-          <TableRow>
-            <TableCell>Name</TableCell>
-            <TableCell>Category</TableCell>
-            <TableCell>EAN</TableCell>
-            <TableCell align="right">Actions</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
+      {isMobile ? (
+        <Stack spacing={1.25}>
           {products.map((p) => (
-            <TableRow key={p.id} hover>
-              <TableCell>{p.name}</TableCell>
-              <TableCell>{categoryMap.get(p.categoryId) ?? p.categoryId}</TableCell>
-              <TableCell>{p.ean || "-"}</TableCell>
-              <TableCell align="right">
-                <Stack direction="row" spacing={1} justifyContent="flex-end">
-                  <Button
-                    component={RouterLink}
-                    to={`/admin/products/${p.id}/edit`}
-                    size="small"
-                    startIcon={<EditOutlinedIcon fontSize="small" />}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    color="error"
-                    size="small"
-                    startIcon={<DeleteOutlineIcon fontSize="small" />}
-                    onClick={() => setDeleteTarget(p)}
-                  >
-                    Delete
-                  </Button>
-                </Stack>
-              </TableCell>
-            </TableRow>
+            <Card key={p.id} variant="outlined">
+              <CardContent sx={{ pb: 1 }}>
+                <Typography variant="h6" sx={{ mb: 0.5 }}>
+                  {p.name}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Category: {categoryMap.get(p.categoryId) ?? p.categoryId}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  EAN: {p.ean || "-"}
+                </Typography>
+              </CardContent>
+              <CardActions sx={{ px: 2, pb: 1.5, pt: 0, gap: 1 }}>
+                <Button
+                  component={RouterLink}
+                  to={`/admin/products/${p.id}/edit`}
+                  size="small"
+                  variant="outlined"
+                  startIcon={<EditOutlinedIcon fontSize="small" />}
+                  sx={{ flex: 1 }}
+                >
+                  Edit
+                </Button>
+                <Button
+                  color="error"
+                  size="small"
+                  variant="outlined"
+                  startIcon={<DeleteOutlineIcon fontSize="small" />}
+                  onClick={() => setDeleteTarget(p)}
+                  sx={{ flex: 1 }}
+                >
+                  Delete
+                </Button>
+              </CardActions>
+            </Card>
           ))}
 
           {!productsLoading && products.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={4} align="center">
-                <Typography color="text.secondary">No products found.</Typography>
-              </TableCell>
-            </TableRow>
+            <Paper variant="outlined" sx={{ p: 2, textAlign: "center" }}>
+              <Typography color="text.secondary">No products found.</Typography>
+            </Paper>
           )}
 
           {productsLoading && (
-            <TableRow>
-              <TableCell colSpan={4} align="center">
-                <Typography color="text.secondary">Loading...</Typography>
-              </TableCell>
-            </TableRow>
+            <Paper variant="outlined" sx={{ p: 2, textAlign: "center" }}>
+              <Typography color="text.secondary">Loading...</Typography>
+            </Paper>
           )}
-        </TableBody>
-      </Table>
+        </Stack>
+      ) : (
+        <TableContainer>
+          <Table size="small" aria-label="admin products table" sx={{ minWidth: 680 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Name</TableCell>
+                <TableCell>Category</TableCell>
+                <TableCell>EAN</TableCell>
+                <TableCell align="right">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {products.map((p) => (
+                <TableRow key={p.id} hover>
+                  <TableCell>{p.name}</TableCell>
+                  <TableCell>{categoryMap.get(p.categoryId) ?? p.categoryId}</TableCell>
+                  <TableCell>{p.ean || "-"}</TableCell>
+                  <TableCell align="right">
+                    <Stack direction="row" spacing={1} justifyContent="flex-end">
+                      <Button
+                        component={RouterLink}
+                        to={`/admin/products/${p.id}/edit`}
+                        size="small"
+                        startIcon={<EditOutlinedIcon fontSize="small" />}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        color="error"
+                        size="small"
+                        startIcon={<DeleteOutlineIcon fontSize="small" />}
+                        onClick={() => setDeleteTarget(p)}
+                      >
+                        Delete
+                      </Button>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+              ))}
+
+              {!productsLoading && products.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} align="center">
+                    <Typography color="text.secondary">No products found.</Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+
+              {productsLoading && (
+                <TableRow>
+                  <TableCell colSpan={4} align="center">
+                    <Typography color="text.secondary">Loading...</Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
 
       {nextCursor && (
         <Box sx={{ mt: 2, textAlign: "center" }}>
