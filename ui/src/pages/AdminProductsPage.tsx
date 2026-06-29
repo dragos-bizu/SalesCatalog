@@ -1,6 +1,4 @@
 import AddIcon from "@mui/icons-material/Add";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -12,19 +10,18 @@ import DialogTitle from "@mui/material/DialogTitle";
 import Paper from "@mui/material/Paper";
 import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { useTheme } from "@mui/material/styles";
 import { useEffect, useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { CategoryTabs } from "../components/CategoryTabs";
 import { SearchBar } from "../components/SearchBar";
+import { AdminProductsDesktopTable } from "../components/admin/AdminProductsDesktopTable";
+import { AdminProductsMobileList } from "../components/admin/AdminProductsMobileList";
+import type { Product } from "../domain/types";
 import { useCategoryManager } from "../managers/CategoryManager";
 import { useProductManager } from "../managers/ProductManager";
-import type { Product } from "../domain/types";
 
 /**
  * Admin products page.
@@ -51,6 +48,9 @@ export function AdminProductsPage() {
     loadMore,
     remove,
   } = productManager;
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
@@ -102,14 +102,15 @@ export function AdminProductsPage() {
   return (
     <Paper sx={{ p: 3 }}>
       <Stack
-        direction="row"
+        direction={{ xs: "column", sm: "row" }}
         justifyContent="space-between"
-        alignItems="center"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={1.5}
         sx={{ mb: 2 }}
       >
         <Typography variant="h4">Products (admin)</Typography>
-        <Stack direction="row" spacing={1}>
-          <Button component={RouterLink} to="/admin/categories">
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+          <Button component={RouterLink} to="/admin/categories" size={isMobile ? "small" : "medium"}>
             Manage categories
           </Button>
           <Button
@@ -117,6 +118,7 @@ export function AdminProductsPage() {
             to="/admin/products/new"
             variant="contained"
             startIcon={<AddIcon />}
+            size={isMobile ? "small" : "medium"}
           >
             New product
           </Button>
@@ -136,61 +138,21 @@ export function AdminProductsPage() {
         onChange={setSelectedCategoryId}
       />
 
-      <Table size="small" aria-label="admin products table">
-        <TableHead>
-          <TableRow>
-            <TableCell>Name</TableCell>
-            <TableCell>Category</TableCell>
-            <TableCell>EAN</TableCell>
-            <TableCell align="right">Actions</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {products.map((p) => (
-            <TableRow key={p.id} hover>
-              <TableCell>{p.name}</TableCell>
-              <TableCell>{categoryMap.get(p.categoryId) ?? p.categoryId}</TableCell>
-              <TableCell>{p.ean || "-"}</TableCell>
-              <TableCell align="right">
-                <Stack direction="row" spacing={1} justifyContent="flex-end">
-                  <Button
-                    component={RouterLink}
-                    to={`/admin/products/${p.id}/edit`}
-                    size="small"
-                    startIcon={<EditOutlinedIcon fontSize="small" />}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    color="error"
-                    size="small"
-                    startIcon={<DeleteOutlineIcon fontSize="small" />}
-                    onClick={() => setDeleteTarget(p)}
-                  >
-                    Delete
-                  </Button>
-                </Stack>
-              </TableCell>
-            </TableRow>
-          ))}
-
-          {!productsLoading && products.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={4} align="center">
-                <Typography color="text.secondary">No products found.</Typography>
-              </TableCell>
-            </TableRow>
-          )}
-
-          {productsLoading && (
-            <TableRow>
-              <TableCell colSpan={4} align="center">
-                <Typography color="text.secondary">Loading...</Typography>
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+      {isMobile ? (
+        <AdminProductsMobileList
+          products={products}
+          loading={productsLoading}
+          categoryMap={categoryMap}
+          onDelete={setDeleteTarget}
+        />
+      ) : (
+        <AdminProductsDesktopTable
+          products={products}
+          loading={productsLoading}
+          categoryMap={categoryMap}
+          onDelete={setDeleteTarget}
+        />
+      )}
 
       {nextCursor && (
         <Box sx={{ mt: 2, textAlign: "center" }}>
