@@ -1,28 +1,17 @@
-import KeyboardArrowLeftIcon from "@mui/icons-material/KeyboardArrowLeft";
-import KeyboardArrowRightIcon from "@mui/icons-material/KeyboardArrowRight";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
 import Chip from "@mui/material/Chip";
-import MobileStepper from "@mui/material/MobileStepper";
 import Paper from "@mui/material/Paper";
 import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { type TouchEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { config } from "../app/config";
+import { ProductImageCarousel } from "../components/ProductImageCarousel";
 import type { Product } from "../domain/types";
 import { useCategoryManager } from "../managers/CategoryManager";
 import { useProductManager } from "../managers/ProductManager";
 import { ApiError } from "../services/api";
-
-function toImageUrl(image: string): string | null {
-  if (image.startsWith("http://") || image.startsWith("https://")) return image;
-  const base = config.imagesBaseUrl?.trim();
-  if (!base) return null;
-  return `${base.replace(/\/$/, "")}/${image.replace(/^\//, "")}`;
-}
 
 function DetailSkeleton() {
   return (
@@ -48,11 +37,6 @@ export function ProductDetailPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
-
-  // Touch-swipe state for mobile carousel gestures.
-  const touchStartX = useRef<number | null>(null);
-  const touchEndX = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,7 +57,6 @@ export function ProductDetailPage() {
       .then((p) => {
         if (cancelled) return;
         setProduct(p);
-        setActiveImageIndex(0);
         setLoading(false);
       })
       .catch((e: unknown) => {
@@ -116,41 +99,7 @@ export function ProductDetailPage() {
     );
   }
 
-  const imageUrls = product.images
-    .map((img) => toImageUrl(img))
-    .filter((u): u is string => Boolean(u));
-  const hasImages = imageUrls.length > 0;
-  const activeImage = hasImages ? imageUrls[activeImageIndex] : null;
 
-  const canGoPrev = activeImageIndex > 0;
-  const canGoNext = activeImageIndex < imageUrls.length - 1;
-
-  const SWIPE_THRESHOLD_PX = 40;
-
-  function onTouchStart(x: number) {
-    touchStartX.current = x;
-    touchEndX.current = null;
-  }
-
-  function onTouchMove(x: number) {
-    touchEndX.current = x;
-  }
-
-  function onTouchEnd() {
-    const start = touchStartX.current;
-    const end = touchEndX.current;
-    if (start == null || end == null || imageUrls.length <= 1) return;
-
-    const delta = end - start;
-    if (Math.abs(delta) < SWIPE_THRESHOLD_PX) return;
-
-    // Swipe left -> next image; swipe right -> previous image.
-    if (delta < 0 && canGoNext) {
-      setActiveImageIndex((i) => i + 1);
-    } else if (delta > 0 && canGoPrev) {
-      setActiveImageIndex((i) => i - 1);
-    }
-  }
 
   return (
     <Paper sx={{ p: 3 }}>
@@ -163,77 +112,7 @@ export function ProductDetailPage() {
           </Stack>
         </Box>
 
-        {activeImage ? (
-          <Box sx={{ border: 1, borderColor: "divider", borderRadius: 1, overflow: "hidden" }}>
-            <Box
-              component="img"
-              src={activeImage}
-              alt={`${product.name} image ${activeImageIndex + 1}`}
-              onTouchStart={(e: TouchEvent<HTMLImageElement>) =>
-                onTouchStart(e.changedTouches[0].clientX)
-              }
-              onTouchMove={(e: TouchEvent<HTMLImageElement>) =>
-                onTouchMove(e.changedTouches[0].clientX)
-              }
-              onTouchEnd={onTouchEnd}
-              sx={{
-                width: "100%",
-                maxHeight: 420,
-                objectFit: "cover",
-                display: "block",
-                touchAction: "pan-y",
-                userSelect: "none",
-              }}
-            />
-
-            {imageUrls.length > 1 && (
-              <MobileStepper
-                variant="dots"
-                steps={imageUrls.length}
-                position="static"
-                activeStep={activeImageIndex}
-                nextButton={
-                  <Button
-                    size="small"
-                    onClick={() => setActiveImageIndex((i) => i + 1)}
-                    disabled={!canGoNext}
-                    aria-label="Next image"
-                  >
-                    Next
-                    <KeyboardArrowRightIcon />
-                  </Button>
-                }
-                backButton={
-                  <Button
-                    size="small"
-                    onClick={() => setActiveImageIndex((i) => i - 1)}
-                    disabled={!canGoPrev}
-                    aria-label="Previous image"
-                  >
-                    <KeyboardArrowLeftIcon />
-                    Back
-                  </Button>
-                }
-              />
-            )}
-          </Box>
-        ) : (
-          <Box
-            sx={{
-              height: 320,
-              bgcolor: "common.white",
-              color: "text.secondary",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              border: 1,
-              borderColor: "divider",
-              borderRadius: 1,
-            }}
-          >
-            <Typography>No image</Typography>
-          </Box>
-        )}
+        <ProductImageCarousel productName={product.name} images={product.images} />
 
         <Box>
           <Typography variant="subtitle1" gutterBottom>
