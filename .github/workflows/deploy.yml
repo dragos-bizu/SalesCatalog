@@ -28,7 +28,7 @@ jobs:
       ui_bucket: ${{ steps.outputs.outputs.ui_bucket }}
       ui_distribution_id: ${{ steps.outputs.outputs.ui_distribution_id }}
       api_base_url: ${{ steps.outputs.outputs.api_base_url }}
-      images_base_url: ${{ steps.outputs.outputs.images_base_url }}
+
       user_pool_id: ${{ steps.outputs.outputs.user_pool_id }}
       user_pool_client_id: ${{ steps.outputs.outputs.user_pool_client_id }}
       hosted_ui_base_url: ${{ steps.outputs.outputs.hosted_ui_base_url }}
@@ -90,7 +90,7 @@ jobs:
             echo "ui_bucket=$(get UiBucketName)"
             echo "ui_distribution_id=$(get UiDistributionId)"
             echo "api_base_url=$(get ApiBaseUrl)"
-            echo "images_base_url=$(get ImagesBaseUrl)"
+
             echo "user_pool_id=$(get UserPoolId)"
             echo "user_pool_client_id=$(get UserPoolClientId)"
             echo "hosted_ui_base_url=$(get HostedUiBaseUrl)"
@@ -143,7 +143,7 @@ jobs:
         working-directory: ui
         env:
           VITE_API_BASE_URL: ${{ needs.deploy-backend.outputs.api_base_url }}
-          VITE_IMAGES_BASE_URL: ${{ needs.deploy-backend.outputs.images_base_url }}
+          VITE_IMAGES_BASE_URL: https://images.${{ secrets.DOMAIN_NAME }}
           VITE_COGNITO_DOMAIN: ${{ needs.deploy-backend.outputs.hosted_ui_base_url }}
           VITE_COGNITO_CLIENT_ID: ${{ needs.deploy-backend.outputs.user_pool_client_id }}
           VITE_COGNITO_REDIRECT_URI: https://${{ secrets.DOMAIN_NAME }}/auth/callback
