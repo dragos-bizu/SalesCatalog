@@ -1,12 +1,7 @@
 import AddIcon from "@mui/icons-material/Add";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import Card from "@mui/material/Card";
-import CardActions from "@mui/material/CardActions";
-import CardContent from "@mui/material/CardContent";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
@@ -15,12 +10,6 @@ import DialogTitle from "@mui/material/DialogTitle";
 import Paper from "@mui/material/Paper";
 import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
-import TableContainer from "@mui/material/TableContainer";
 import Typography from "@mui/material/Typography";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useTheme } from "@mui/material/styles";
@@ -28,9 +17,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { CategoryTabs } from "../components/CategoryTabs";
 import { SearchBar } from "../components/SearchBar";
+import { AdminProductsDesktopTable } from "../components/admin/AdminProductsDesktopTable";
+import { AdminProductsMobileList } from "../components/admin/AdminProductsMobileList";
+import type { Product } from "../domain/types";
 import { useCategoryManager } from "../managers/CategoryManager";
 import { useProductManager } from "../managers/ProductManager";
-import type { Product } from "../domain/types";
 
 /**
  * Admin products page.
@@ -148,115 +139,19 @@ export function AdminProductsPage() {
       />
 
       {isMobile ? (
-        <Stack spacing={1.25}>
-          {products.map((p) => (
-            <Card key={p.id} variant="outlined">
-              <CardContent sx={{ pb: 1 }}>
-                <Typography variant="h6" sx={{ mb: 0.5 }}>
-                  {p.name}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Category: {categoryMap.get(p.categoryId) ?? p.categoryId}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  EAN: {p.ean || "-"}
-                </Typography>
-              </CardContent>
-              <CardActions sx={{ px: 2, pb: 1.5, pt: 0, gap: 1 }}>
-                <Button
-                  component={RouterLink}
-                  to={`/admin/products/${p.id}/edit`}
-                  size="small"
-                  variant="outlined"
-                  startIcon={<EditOutlinedIcon fontSize="small" />}
-                  sx={{ flex: 1 }}
-                >
-                  Edit
-                </Button>
-                <Button
-                  color="error"
-                  size="small"
-                  variant="outlined"
-                  startIcon={<DeleteOutlineIcon fontSize="small" />}
-                  onClick={() => setDeleteTarget(p)}
-                  sx={{ flex: 1 }}
-                >
-                  Delete
-                </Button>
-              </CardActions>
-            </Card>
-          ))}
-
-          {!productsLoading && products.length === 0 && (
-            <Paper variant="outlined" sx={{ p: 2, textAlign: "center" }}>
-              <Typography color="text.secondary">No products found.</Typography>
-            </Paper>
-          )}
-
-          {productsLoading && (
-            <Paper variant="outlined" sx={{ p: 2, textAlign: "center" }}>
-              <Typography color="text.secondary">Loading...</Typography>
-            </Paper>
-          )}
-        </Stack>
+        <AdminProductsMobileList
+          products={products}
+          loading={productsLoading}
+          categoryMap={categoryMap}
+          onDelete={setDeleteTarget}
+        />
       ) : (
-        <TableContainer>
-          <Table size="small" aria-label="admin products table" sx={{ minWidth: 680 }}>
-            <TableHead>
-              <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Category</TableCell>
-                <TableCell>EAN</TableCell>
-                <TableCell align="right">Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {products.map((p) => (
-                <TableRow key={p.id} hover>
-                  <TableCell>{p.name}</TableCell>
-                  <TableCell>{categoryMap.get(p.categoryId) ?? p.categoryId}</TableCell>
-                  <TableCell>{p.ean || "-"}</TableCell>
-                  <TableCell align="right">
-                    <Stack direction="row" spacing={1} justifyContent="flex-end">
-                      <Button
-                        component={RouterLink}
-                        to={`/admin/products/${p.id}/edit`}
-                        size="small"
-                        startIcon={<EditOutlinedIcon fontSize="small" />}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        color="error"
-                        size="small"
-                        startIcon={<DeleteOutlineIcon fontSize="small" />}
-                        onClick={() => setDeleteTarget(p)}
-                      >
-                        Delete
-                      </Button>
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ))}
-
-              {!productsLoading && products.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} align="center">
-                    <Typography color="text.secondary">No products found.</Typography>
-                  </TableCell>
-                </TableRow>
-              )}
-
-              {productsLoading && (
-                <TableRow>
-                  <TableCell colSpan={4} align="center">
-                    <Typography color="text.secondary">Loading...</Typography>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
+        <AdminProductsDesktopTable
+          products={products}
+          loading={productsLoading}
+          categoryMap={categoryMap}
+          onDelete={setDeleteTarget}
+        />
       )}
 
       {nextCursor && (
