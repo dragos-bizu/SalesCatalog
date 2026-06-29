@@ -110,7 +110,8 @@ npm run test
 2. Admin chooses **Continue with Google** → completes Google OAuth.
 3. Cognito redirects back to `VITE_COGNITO_REDIRECT_URI` with tokens.
 4. The app stores the JWT (in memory; refresh tokens via Cognito) and attaches `Authorization: Bearer <id_token>` to admin API calls.
-5. Public pages do **not** require any token.
+5. Admin pages/actions require membership in the configured Cognito group (`VITE_ADMIN_GROUP`, default `admins`).
+6. Public pages do **not** require any token.
 
 ## Image uploads (admin)
 

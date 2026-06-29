@@ -44,3 +44,36 @@ def test_get_admin_identity_defaults_missing_email():
 def test_get_admin_identity_raises_without_claims():
     with pytest.raises(auth.UnauthorizedError):
         auth.get_admin_identity({})
+
+
+def test_require_admin_allows_when_group_matches_csv(monkeypatch):
+    monkeypatch.setenv("ADMIN_GROUP", "admins")
+    event = _event_with_claims({
+        "sub": "u1",
+        "email": "admin@example.com",
+        "cognito:groups": "admins,other",
+    })
+    identity = auth.require_admin(event)
+    assert identity["sub"] == "u1"
+
+
+def test_require_admin_allows_when_group_matches_list(monkeypatch):
+    monkeypatch.setenv("ADMIN_GROUP", "admins")
+    event = _event_with_claims({
+        "sub": "u1",
+        "cognito:groups": ["users", "admins"],
+    })
+    assert auth.require_admin(event)["sub"] == "u1"
+
+
+def test_require_admin_raises_forbidden_when_group_missing(monkeypatch):
+    monkeypatch.setenv("ADMIN_GROUP", "admins")
+    event = _event_with_claims({"sub": "u1", "cognito:groups": "users"})
+    with pytest.raises(auth.ForbiddenError):
+        auth.require_admin(event)
+
+
+def test_require_admin_without_group_only_checks_auth(monkeypatch):
+    monkeypatch.delenv("ADMIN_GROUP", raising=False)
+    event = _event_with_claims({"sub": "u1"})
+    assert auth.require_admin(event)["sub"] == "u1"

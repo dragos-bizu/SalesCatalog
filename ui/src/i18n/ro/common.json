@@ -85,7 +85,8 @@
     }
   },
   "auth": {
-    "adminSignIn": "Admin sign in",
+    "adminSignIn": "Autentificare admin",
+    "notInAdminGroup": "Esti autentificat, dar nu ai acces la zona de administrare.",
     "signInHint": "Vei fi redirectionat pentru sign in.",
     "signInWithCognito": "Sign in cu Cognito",
     "completingSignIn": "Incarcare sign in…",

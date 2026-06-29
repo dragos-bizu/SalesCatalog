@@ -12,6 +12,7 @@ import { useCallback } from "react";
 import { useAppDispatch, useAppSelector } from "../hooks/redux";
 import {
   selectEmail,
+  selectIsAdmin,
   selectIsAuthenticated,
   signedOut,
   tokensSet,
@@ -102,6 +103,7 @@ export async function ensureFreshTokenStandalone(): Promise<string | null> {
 
 export interface UseAuthManager {
   isAuthenticated: boolean;
+  isAdmin: boolean;
   email: string | null;
   /** Start the sign-in flow: redirects to the Cognito Hosted UI. */
   signIn(returnTo?: string): Promise<void>;
@@ -120,6 +122,7 @@ export interface UseAuthManager {
 export function useAuthManager(): UseAuthManager {
   const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const isAdmin = useAppSelector(selectIsAdmin);
   const email = useAppSelector(selectEmail);
 
   const signIn = useCallback(async (returnTo: string = "/admin") => {
@@ -165,6 +168,7 @@ export function useAuthManager(): UseAuthManager {
 
   return {
     isAuthenticated,
+    isAdmin,
     email,
     signIn,
     handleCallback,

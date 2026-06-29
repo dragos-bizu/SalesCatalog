@@ -1,11 +1,12 @@
 // Redux slice for admin authentication state.
 //
-// Holds Cognito tokens + a derived "isAuthenticated" flag. Hydrates from
+// Holds Cognito tokens + derived identity/authorization fields. Hydrates from
 // localStorage on app start (see store.ts) so a page reload doesn't sign
 // the admin out.
 
 import { createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
+import { config } from "../app/config";
 import {
   clearAuth,
   loadAuth,
@@ -21,6 +22,47 @@ export interface AuthState {
   expiresAt: number | null;
   /** Email/name derived from the ID token claims, if available. */
   email: string | null;
+  /** Cognito groups from the token (e.g. ["admins"]). */
+  groups: string[];
+}
+
+function decodeClaims(idToken: string): Record<string, unknown> {
+  const payload = idToken.split(".")[1];
+  const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+  return JSON.parse(json) as Record<string, unknown>;
+}
+
+/** Decode the email claim from a JWT ID token without verifying the signature. */
+function extractEmail(idToken: string): string | null {
+  try {
+    const claims = decodeClaims(idToken) as { email?: string };
+    return claims.email ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function extractGroups(idToken: string): string[] {
+  try {
+    const claims = decodeClaims(idToken);
+    const raw = claims["cognito:groups"];
+
+    if (Array.isArray(raw)) {
+      return raw.map((x) => String(x).trim()).filter(Boolean);
+    }
+    if (typeof raw === "string") {
+      const text = raw.trim().replace(/^\[/, "").replace(/\]$/, "");
+      if (!text) return [];
+      return text
+        .split(",")
+        .map((x) => x.trim().replace(/^['"]|['"]$/g, ""))
+        .filter(Boolean);
+    }
+
+    return [];
+  } catch {
+    return [];
+  }
 }
 
 function initialFromStorage(): AuthState {
@@ -32,6 +74,7 @@ function initialFromStorage(): AuthState {
       refreshToken: null,
       expiresAt: null,
       email: null,
+      groups: [],
     };
   }
   return {
@@ -40,19 +83,8 @@ function initialFromStorage(): AuthState {
     refreshToken: persisted.refreshToken,
     expiresAt: persisted.expiresAt,
     email: extractEmail(persisted.idToken),
+    groups: extractGroups(persisted.idToken),
   };
-}
-
-/** Decode the email claim from a JWT ID token without verifying the signature. */
-function extractEmail(idToken: string): string | null {
-  try {
-    const payload = idToken.split(".")[1];
-    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
-    const claims = JSON.parse(json) as { email?: string };
-    return claims.email ?? null;
-  } catch {
-    return null;
-  }
 }
 
 export interface TokensPayload {
@@ -76,6 +108,7 @@ const slice = createSlice({
       }
       state.expiresAt = action.payload.expiresAt;
       state.email = extractEmail(action.payload.idToken);
+      state.groups = extractGroups(action.payload.idToken);
 
       const persisted: PersistedAuth = {
         idToken: state.idToken,
@@ -91,6 +124,7 @@ const slice = createSlice({
       state.refreshToken = null;
       state.expiresAt = null;
       state.email = null;
+      state.groups = [];
       clearAuth();
     },
   },
@@ -115,3 +149,9 @@ export const selectEmail = (s: RootState): string | null => s.auth.email;
 
 export const selectRefreshToken = (s: RootState): string | null =>
   s.auth.refreshToken;
+
+export const selectIsAdmin = (s: RootState): boolean => {
+  if (!selectIsAuthenticated(s)) return false;
+  const required = config.adminGroup?.trim() || "admins";
+  return s.auth.groups.includes(required);
+};

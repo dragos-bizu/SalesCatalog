@@ -7,7 +7,7 @@ This folder is **not** a Lambda itself — it is packaged as a **Lambda Layer** 
 ## Contents
 
 - `db.py` — DynamoDB client/resource configuration and small helpers (table handles, serialization, pagination cursor encoding/decoding).
-- `auth.py` — helpers for reading the authenticated admin identity from an API Gateway request context (the JWT itself is validated by API Gateway's Cognito authorizer, so these helpers only extract claims).
+- `auth.py` — helpers for reading verified JWT claims and enforcing admin authorization (Cognito group membership) from API Gateway request context.
 
 Additional helpers will be added here as needed (e.g. response builders, validation utilities). Anything used by **two or more** Lambdas belongs here; anything used by exactly one belongs inside that Lambda's folder.
 

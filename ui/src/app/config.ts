@@ -8,6 +8,7 @@ export interface AppConfig {
   cognitoClientId: string;
   cognitoRedirectUri: string;
   cognitoLogoutUri: string;
+  adminGroup: string;
 }
 
 export const config: AppConfig = {
@@ -17,4 +18,5 @@ export const config: AppConfig = {
   cognitoClientId: import.meta.env.VITE_COGNITO_CLIENT_ID ?? "",
   cognitoRedirectUri: import.meta.env.VITE_COGNITO_REDIRECT_URI ?? "",
   cognitoLogoutUri: import.meta.env.VITE_COGNITO_LOGOUT_URI ?? "",
+  adminGroup: import.meta.env.VITE_ADMIN_GROUP ?? "admins",
 };
