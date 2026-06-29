@@ -77,11 +77,6 @@ Parameters:
     Type: String
     Description: Email address that receives cost budget alerts.
 
-  AiDescriptionModelId:
-    Type: String
-    Default: amazon.titan-text-express-v1
-    Description: AWS Bedrock foundation model id used to improve product descriptions.
-
   AdminGroupName:
     Type: String
     Default: admins
