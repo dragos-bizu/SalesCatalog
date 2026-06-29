@@ -11,7 +11,6 @@ Description: >
 # Parameters
 # ---------------------------------------------------------------------------
 Parameters:
-
   GitHubOrg:
     Type: String
     Description: GitHub organization or user that owns the repository (e.g. "my-user").
@@ -53,7 +52,6 @@ Conditions:
 # Resources
 # ---------------------------------------------------------------------------
 Resources:
-
   # -------------------------------------------------------------------------
   # GitHub Actions OIDC identity provider.
   #
@@ -124,7 +122,6 @@ Resources:
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
-
           # --- CloudFormation: manage the app stack + SAM transforms ---------
           - Sid: CloudFormation
             Effect: Allow
@@ -268,6 +265,10 @@ Resources:
               - cognito-idp:SetUserPoolMfaConfig
               - cognito-idp:TagResource
               - cognito-idp:UntagResource
+              - cognito-idp:DeleteGroup
+              - cognito-idp:GetGroup
+              - cognito-idp:CreateGroup
+              - cognito-idp:UpdateGroup
             Resource: "*"
 
           # --- DynamoDB ------------------------------------------------------
@@ -372,7 +373,6 @@ Resources:
 # Outputs
 # ---------------------------------------------------------------------------
 Outputs:
-
   DeployRoleArn:
     Description: ARN of the role GitHub Actions assumes. Store as the AWS_DEPLOY_ROLE_ARN secret.
     Value: !GetAtt GitHubDeployRole.Arn
