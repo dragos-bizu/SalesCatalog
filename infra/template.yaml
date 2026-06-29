@@ -77,19 +77,11 @@ Parameters:
     Type: String
     Description: Email address that receives cost budget alerts.
 
-<<<<<<< Updated upstream
-=======
-  AiDescriptionModelId:
-    Type: String
-    Default: amazon.titan-text-express-v1
-    Description: AWS Bedrock foundation model id used to improve product descriptions.
-
   AdminGroupName:
     Type: String
     Default: admins
     Description: Cognito group required for admin CRUD routes.
 
->>>>>>> Stashed changes
 # ---------------------------------------------------------------------------
 # Globals — defaults applied to every SAM resource of the given type.
 # ---------------------------------------------------------------------------
