@@ -89,6 +89,7 @@
   },
   "auth": {
     "adminSignIn": "Admin sign in",
+    "notInAdminGroup": "You are signed in but not authorized for admin access.",
     "signInHint": "You will be redirected to the Cognito Hosted UI to sign in.",
     "signInWithCognito": "Sign in with Cognito",
     "completingSignIn": "Completing sign-in…",

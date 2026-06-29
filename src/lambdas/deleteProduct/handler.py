@@ -14,7 +14,7 @@ Response:
 from aws_lambda_powertools import Logger
 from botocore.exceptions import ClientError
 
-from salescatalog_shared import db, http
+from salescatalog_shared import auth, db, http
 
 logger = Logger()
 
@@ -22,6 +22,13 @@ logger = Logger()
 @logger.inject_lambda_context(log_event=False)
 def lambda_handler(event, context):
     """Entry point for the deleteProduct Lambda."""
+    try:
+        auth.require_admin(event)
+    except auth.UnauthorizedError as exc:
+        return http.error(401, str(exc))
+    except auth.ForbiddenError as exc:
+        return http.error(403, str(exc))
+
     product_id = (event.get("pathParameters") or {}).get("id")
     if not product_id:
         return http.error(400, "Missing product id")

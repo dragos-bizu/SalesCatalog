@@ -82,6 +82,11 @@ Parameters:
     Default: amazon.titan-text-express-v1
     Description: AWS Bedrock foundation model id used to improve product descriptions.
 
+  AdminGroupName:
+    Type: String
+    Default: admins
+    Description: Cognito group required for admin CRUD routes.
+
 # ---------------------------------------------------------------------------
 # Globals — defaults applied to every SAM resource of the given type.
 # ---------------------------------------------------------------------------
@@ -99,6 +104,7 @@ Globals:
         ENVIRONMENT: !Ref Environment
         POWERTOOLS_SERVICE_NAME: salescatalog
         LOG_LEVEL: INFO
+        ADMIN_GROUP: !Ref AdminGroupName
     Tags:
       Project: SalesCatalog
       Environment: !Ref Environment
@@ -112,8 +118,8 @@ Resources:
   # Cognito User Pool
   #
   # Admin-only: self sign-up is disabled. Admins are created by an existing
-  # admin (AdminCreateUser) or arrive via the Google identity provider. Any
-  # user that successfully signs in is considered an admin by definition.
+  # admin or arrive via the Google identity provider. Authorization is
+  # enforced by Cognito group membership (AdminGroupName) in Lambda handlers.
   # -------------------------------------------------------------------------
   UserPool:
     Type: AWS::Cognito::UserPool
@@ -149,6 +155,20 @@ Resources:
       UserPoolTags:
         Project: SalesCatalog
         Environment: !Ref Environment
+
+  # -------------------------------------------------------------------------
+  # Cognito admins group
+  #
+  # Only users in this group are authorized by Lambda handlers to perform
+  # admin operations (products/categories CRUD, image upload URL minting,
+  # AI description suggestion).
+  # -------------------------------------------------------------------------
+  AdminsGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      GroupName: !Ref AdminGroupName
+      UserPoolId: !Ref UserPool
+      Description: SalesCatalog admin authorization group.
 
   # -------------------------------------------------------------------------
   # Cognito User Pool Domain (Hosted UI)
@@ -1147,6 +1167,12 @@ Outputs:
     Value: !Ref UserPoolClient
     Export:
       Name: !Sub ${AWS::StackName}-UserPoolClientId
+
+  AdminGroupName:
+    Description: Cognito group required for admin API authorization.
+    Value: !Ref AdminGroupName
+    Export:
+      Name: !Sub ${AWS::StackName}-AdminGroupName
 
   UserPoolDomain:
     Description: Cognito Hosted UI domain (prefix only).

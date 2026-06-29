@@ -28,7 +28,7 @@ from typing import Any
 import boto3
 from aws_lambda_powertools import Logger
 
-from salescatalog_shared import http
+from salescatalog_shared import auth, http
 
 logger = Logger()
 
@@ -112,7 +112,12 @@ def _invoke_titan(model_id: str, prompt: str) -> str:
 @logger.inject_lambda_context(log_event=False)
 def lambda_handler(event, context):
     try:
+        auth.require_admin(event)
         body = http.parse_json_body(event)
+    except auth.UnauthorizedError as exc:
+        return http.error(401, str(exc))
+    except auth.ForbiddenError as exc:
+        return http.error(403, str(exc))
     except ValueError as exc:
         return http.error(400, str(exc))
 

@@ -37,7 +37,7 @@ import boto3
 from aws_lambda_powertools import Logger
 from botocore.config import Config
 
-from salescatalog_shared import http
+from salescatalog_shared import auth, http
 
 logger = Logger()
 
@@ -81,7 +81,12 @@ def _images_base_url() -> str:
 def lambda_handler(event, context):
     """Entry point for the createImageUploadUrl Lambda."""
     try:
+        auth.require_admin(event)
         body = http.parse_json_body(event)
+    except auth.UnauthorizedError as exc:
+        return http.error(401, str(exc))
+    except auth.ForbiddenError as exc:
+        return http.error(403, str(exc))
     except ValueError as exc:
         return http.error(400, str(exc))
 

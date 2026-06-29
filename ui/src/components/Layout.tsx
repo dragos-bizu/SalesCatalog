@@ -22,7 +22,7 @@ import { useAuthManager } from "../managers/AuthManager";
  */
 export function Layout() {
   const { t } = useTranslation();
-  const { isAuthenticated, email, signOut } = useAuthManager();
+  const { isAuthenticated, isAdmin, email, signOut } = useAuthManager();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
@@ -57,9 +57,11 @@ export function Layout() {
             <Box sx={{ display: "flex", alignItems: "center" }}>
               {isAuthenticated ? (
                 <>
-                  <Button component={RouterLink} to="/admin" color="inherit">
-                    {t("nav.admin")}
-                  </Button>
+                  {isAdmin && (
+                    <Button component={RouterLink} to="/admin" color="inherit">
+                      {t("nav.admin")}
+                    </Button>
+                  )}
                   {email && (
                     <Typography
                       variant="body2"
@@ -97,14 +99,18 @@ export function Layout() {
               >
                 {isAuthenticated ? (
                   [
-                    <MenuItem
-                      key="admin"
-                      component={RouterLink}
-                      to="/admin"
-                      onClick={closeMenu}
-                    >
-                      {t("nav.admin")}
-                    </MenuItem>,
+                    ...(isAdmin
+                      ? [
+                          <MenuItem
+                            key="admin"
+                            component={RouterLink}
+                            to="/admin"
+                            onClick={closeMenu}
+                          >
+                            {t("nav.admin")}
+                          </MenuItem>,
+                        ]
+                      : []),
                     <MenuItem key="email" disabled>
                       {email || "-"}
                     </MenuItem>,
