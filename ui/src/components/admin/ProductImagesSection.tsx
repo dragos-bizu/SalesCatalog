@@ -7,6 +7,7 @@ import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { ChangeEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { config } from "../../app/config";
 
 export interface ProductImagesSectionProps {
@@ -34,16 +35,18 @@ export function ProductImagesSection({
   onUploadFiles,
   onRemoveImage,
 }: ProductImagesSectionProps) {
+  const { t } = useTranslation();
+
   return (
     <>
       <Divider />
 
       <Stack spacing={1}>
-        <Typography variant="subtitle1">Images</Typography>
+        <Typography variant="subtitle1">{t("products.form.images")}</Typography>
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems="center">
           <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateIcon />}>
-            Select files
+            {t("products.form.selectFiles")}
             <input hidden multiple type="file" accept="image/*" onChange={onSelectFiles} />
           </Button>
           <Button
@@ -51,7 +54,9 @@ export function ProductImagesSection({
             onClick={onUploadFiles}
             disabled={uploading || selectedFiles.length === 0}
           >
-            {uploading ? "Uploading…" : `Upload selected (${selectedFiles.length})`}
+            {uploading
+              ? t("products.form.uploading")
+              : t("products.form.uploadSelected", { count: selectedFiles.length })}
           </Button>
         </Stack>
 
@@ -80,17 +85,17 @@ export function ProductImagesSection({
                     <Box
                       component="img"
                       src={src}
-                      alt={`Product image ${index + 1}`}
+                      alt={t("products.imageAlt", { name: t("products.newProduct"), index: index + 1 })}
                       sx={{ width: "100%", height: "100%", objectFit: "cover" }}
                     />
                   ) : (
                     <Typography variant="caption" color="text.secondary">
-                      Preview
+                      {t("products.form.preview", "Preview")}
                     </Typography>
                   )}
 
                   <IconButton
-                    aria-label={`Remove image ${index + 1}`}
+                    aria-label={t("products.form.removeImageAria", "Remove image {{index}}", { index: index + 1 })}
                     size="small"
                     onClick={() => onRemoveImage(key)}
                     sx={{
@@ -109,7 +114,7 @@ export function ProductImagesSection({
             })}
           </Stack>
         ) : (
-          <Typography color="text.secondary">No images uploaded yet.</Typography>
+          <Typography color="text.secondary">{t("products.form.noImages")}</Typography>
         )}
       </Stack>
     </>

@@ -5,6 +5,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuthManager } from "../managers/AuthManager";
 
@@ -15,6 +16,7 @@ import { useAuthManager } from "../managers/AuthManager";
  *   3. Navigates to the originally requested admin URL (or /admin).
  */
 export function AuthCallbackPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { handleCallback } = useAuthManager();
@@ -30,28 +32,28 @@ export function AuthCallbackPage() {
       return;
     }
     if (!code || !state) {
-      setError("Missing 'code' or 'state' query parameter");
+      setError(t("auth.missingParams", "Missing 'code' or 'state' query parameter"));
       return;
     }
 
     handleCallback(code, state)
       .then(({ returnTo }) => navigate(returnTo, { replace: true }))
       .catch((e: Error) => setError(e.message));
-  }, [params, handleCallback, navigate]);
+  }, [params, handleCallback, navigate, t]);
 
   return (
     <Paper sx={{ p: 4 }}>
       {error ? (
         <Stack spacing={2}>
-          <Alert severity="error">Sign-in failed: {error}</Alert>
+          <Alert severity="error">{t("auth.signInFailed", { message: error })}</Alert>
           <Box>
-            <a href="/login">Try again</a>
+            <a href="/login">{t("auth.tryAgain")}</a>
           </Box>
         </Stack>
       ) : (
         <Stack direction="row" alignItems="center" spacing={2}>
           <CircularProgress size={20} />
-          <Typography>Completing sign-in…</Typography>
+          <Typography>{t("auth.completingSignIn")}</Typography>
         </Stack>
       )}
     </Paper>

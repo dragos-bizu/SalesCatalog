@@ -15,6 +15,7 @@ import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link as RouterLink } from "react-router-dom";
 import type { Category } from "../domain/types";
 import { useCategoryManager } from "../managers/CategoryManager";
@@ -27,6 +28,7 @@ import { ApiError } from "../services/api";
  * still reference a category; the error is shown in the snackbar.
  */
 export function AdminCategoriesPage() {
+  const { t } = useTranslation();
   const categoryManager = useCategoryManager();
   const {
     items,
@@ -74,9 +76,9 @@ export function AdminCategoriesPage() {
     try {
       await create({ name });
       setNewName("");
-      setSuccess(`Category '${name}' created`);
+      setSuccess(t("categories.created", { name }));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to create category");
+      setError(e instanceof Error ? e.message : t("errors.createCategory"));
     } finally {
       setCreating(false);
     }
@@ -99,10 +101,10 @@ export function AdminCategoriesPage() {
     setError(null);
     try {
       await update(editingId, { name: editingName.trim() });
-      setSuccess("Category updated");
+      setSuccess(t("categories.updated"));
       cancelEdit();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to update category");
+      setError(e instanceof Error ? e.message : t("errors.updateCategory"));
     } finally {
       setSavingEdit(false);
     }
@@ -115,13 +117,13 @@ export function AdminCategoriesPage() {
     setError(null);
     try {
       await remove(deleteTarget.id);
-      setSuccess("Category deleted");
+      setSuccess(t("categories.deleted"));
       setDeleteTarget(null);
     } catch (e: unknown) {
       if (e instanceof ApiError && e.status === 409) {
-        setError("Cannot delete category: it still has products.");
+        setError(t("categories.deleteBlocked"));
       } else {
-        setError(e instanceof Error ? e.message : "Failed to delete category");
+        setError(e instanceof Error ? e.message : t("errors.deleteCategory"));
       }
     } finally {
       setDeleting(false);
@@ -132,16 +134,16 @@ export function AdminCategoriesPage() {
     <Paper sx={{ p: 3 }}>
       <Stack spacing={2}>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Typography variant="h4">Categories (admin)</Typography>
+          <Typography variant="h4">{t("categories.manageTitle")}</Typography>
           <Button component={RouterLink} to="/admin" startIcon={<ArrowBackIcon />}>
-            Back
+            {t("nav.back")}
           </Button>
         </Stack>
 
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
           <TextField
             fullWidth
-            label="New category"
+            label={t("categories.newCategory")}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => {
@@ -156,16 +158,16 @@ export function AdminCategoriesPage() {
             onClick={() => void onCreateCategory()}
             disabled={creating || !newName.trim()}
           >
-            Add category
+            {t("categories.addCategory")}
           </Button>
         </Stack>
 
         {loading && items.length === 0 && (
-          <Typography color="text.secondary">Loading categories...</Typography>
+          <Typography color="text.secondary">{t("common.loading")}</Typography>
         )}
 
         {!loading && sorted.length === 0 && (
-          <Typography color="text.secondary">No categories yet.</Typography>
+          <Typography color="text.secondary">{t("categories.noCategories")}</Typography>
         )}
 
         <Stack spacing={1}>
@@ -195,10 +197,10 @@ export function AdminCategoriesPage() {
                         onClick={() => void saveEdit()}
                         disabled={savingEdit || !editingName.trim()}
                       >
-                        Save
+                        {t("common.save")}
                       </Button>
                       <Button size="small" onClick={cancelEdit} disabled={savingEdit}>
-                        Cancel
+                        {t("common.cancel")}
                       </Button>
                     </Stack>
                   </Stack>
@@ -211,7 +213,7 @@ export function AdminCategoriesPage() {
                         startIcon={<EditOutlinedIcon fontSize="small" />}
                         onClick={() => startEdit(c)}
                       >
-                        Edit
+                        {t("common.edit")}
                       </Button>
                       <Button
                         size="small"
@@ -219,7 +221,7 @@ export function AdminCategoriesPage() {
                         startIcon={<DeleteOutlineIcon fontSize="small" />}
                         onClick={() => setDeleteTarget(c)}
                       >
-                        Delete
+                        {t("common.delete")}
                       </Button>
                     </Stack>
                   </Stack>
@@ -231,19 +233,18 @@ export function AdminCategoriesPage() {
       </Stack>
 
       <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)}>
-        <DialogTitle>Delete category</DialogTitle>
+        <DialogTitle>{t("categories.deleteTitle")}</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            Are you sure you want to delete{" "}
-            <strong>{deleteTarget?.name ?? "this category"}</strong>?
+            {t("categories.deleteConfirm", { name: deleteTarget?.name ?? t("categories.newCategory") })}
           </DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteTarget(null)} disabled={deleting}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button color="error" onClick={() => void confirmDelete()} disabled={deleting}>
-            Delete
+            {t("common.delete")}
           </Button>
         </DialogActions>
       </Dialog>

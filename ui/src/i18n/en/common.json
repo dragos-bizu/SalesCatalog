@@ -1,0 +1,111 @@
+{
+  "app": {
+    "name": "SalesCatalog",
+    "footer": "SalesCatalog"
+  },
+  "nav": {
+    "admin": "Admin",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "back": "Back"
+  },
+  "search": {
+    "label": "Search products",
+    "button": "Search"
+  },
+  "common": {
+    "loading": "Loading...",
+    "noImage": "No image",
+    "noDescription": "No description",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "next": "Next",
+    "back": "Back",
+    "loadMore": "Load more",
+    "actions": "Actions"
+  },
+  "categories": {
+    "allProducts": "All products",
+    "manageTitle": "Categories (admin)",
+    "manageAction": "Manage categories",
+    "newCategory": "New category",
+    "addCategory": "Add category",
+    "createNewCategory": "Create new category",
+    "noCategories": "No categories yet.",
+    "deleteTitle": "Delete category",
+    "deleteConfirm": "Are you sure you want to delete {{name}}?",
+    "deleteBlocked": "Cannot delete category: it still has products.",
+    "created": "Category '{{name}}' created",
+    "updated": "Category updated",
+    "deleted": "Category deleted"
+  },
+  "products": {
+    "title": "Products",
+    "adminTitle": "Products (admin)",
+    "browseHelp": "Browse products by category and search within the selected category.",
+    "noProducts": "No products found.",
+    "newProduct": "New product",
+    "createProduct": "Create product",
+    "saveChanges": "Save changes",
+    "created": "Product created",
+    "updated": "Product updated",
+    "deleteTitle": "Delete product",
+    "deleteConfirm": "Are you sure you want to delete {{name}}?",
+    "detailTitle": "Product detail",
+    "detailNotFound": "Product not found",
+    "detailMissingId": "Missing product id",
+    "noData": "No product data available.",
+    "description": "Description",
+    "categoryChip": "Category: {{name}}",
+    "eanChip": "EAN: {{ean}}",
+    "imageAlt": "{{name}} image {{index}}",
+    "imageCarousel": {
+      "nextAria": "Next image",
+      "prevAria": "Previous image"
+    },
+    "loadingProduct": "Loading product…",
+    "form": {
+      "newTitle": "New product",
+      "editTitle": "Edit product",
+      "name": "Name",
+      "category": "Category",
+      "ean": "EAN",
+      "description": "Description",
+      "images": "Images",
+      "selectFiles": "Select files",
+      "uploadSelected": "Upload selected ({{count}})",
+      "uploading": "Uploading…",
+      "noImages": "No images uploaded yet.",
+      "imagesUploaded": "Images uploaded",
+      "saving": "Saving…",
+      "preview": "Preview",
+      "removeImageAria": "Remove image {{index}}"
+    }
+  },
+  "auth": {
+    "adminSignIn": "Admin sign in",
+    "signInHint": "You will be redirected to the Cognito Hosted UI to sign in.",
+    "signInWithCognito": "Sign in with Cognito",
+    "completingSignIn": "Completing sign-in…",
+    "missingParams": "Missing 'code' or 'state' query parameter",
+    "signInFailed": "Sign-in failed: {{message}}",
+    "tryAgain": "Try again"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "message": "The page you're looking for doesn't exist.",
+    "backHome": "Back to home"
+  },
+  "errors": {
+    "loadCategories": "Failed to load categories",
+    "loadProduct": "Failed to load product",
+    "saveProduct": "Failed to save product",
+    "createCategory": "Failed to create category",
+    "uploadImages": "Failed to upload images",
+    "deleteCategory": "Failed to delete category",
+    "updateCategory": "Failed to update category",
+    "createCategoryGeneric": "Failed to create category"
+  }
+}

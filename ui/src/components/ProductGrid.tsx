@@ -2,6 +2,7 @@ import Grid from "@mui/material/Grid";
 import Paper from "@mui/material/Paper";
 import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
+import { useTranslation } from "react-i18next";
 import type { Product } from "../domain/types";
 import { ProductCard } from "./ProductCard";
 
@@ -15,6 +16,8 @@ export interface ProductGridProps {
  * Error handling is intentionally outside (snackbar in HomePage).
  */
 export function ProductGrid({ products, loading }: ProductGridProps) {
+  const { t } = useTranslation();
+
   if (loading && products.length === 0) {
     return (
       <Grid container spacing={2}>
@@ -34,7 +37,7 @@ export function ProductGrid({ products, loading }: ProductGridProps) {
   if (!loading && products.length === 0) {
     return (
       <Paper sx={{ p: 3, textAlign: "center" }}>
-        <Typography color="text.secondary">No products found.</Typography>
+        <Typography color="text.secondary">{t("products.noProducts")}</Typography>
       </Paper>
     );
   }

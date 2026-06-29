@@ -6,6 +6,7 @@ import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { ProductImageCarousel } from "../components/ProductImageCarousel";
 import type { Product } from "../domain/types";
@@ -28,6 +29,7 @@ function DetailSkeleton() {
 
 /** Public product detail page. */
 export function ProductDetailPage() {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const productManager = useProductManager();
   const categoryManager = useCategoryManager();
@@ -42,7 +44,7 @@ export function ProductDetailPage() {
     let cancelled = false;
 
     if (!id) {
-      setError("Missing product id");
+      setError(t("products.detailMissingId", "Missing product id"));
       setLoading(false);
       return;
     }
@@ -62,9 +64,9 @@ export function ProductDetailPage() {
       .catch((e: unknown) => {
         if (cancelled) return;
         if (e instanceof ApiError && e.status === 404) {
-          setError("Product not found");
+          setError(t("products.detailNotFound"));
         } else {
-          setError(e instanceof Error ? e.message : "Failed to load product");
+          setError(e instanceof Error ? e.message : t("errors.loadProduct"));
         }
         setLoading(false);
       });
@@ -72,13 +74,11 @@ export function ProductDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, fetchOne, ensureCategoriesLoaded]);
+  }, [id, fetchOne, ensureCategoriesLoaded, t]);
 
   const categoryName = useMemo(() => {
     if (!product) return null;
-    return (
-      categories.find((c) => c.id === product.categoryId)?.name ?? product.categoryId
-    );
+    return categories.find((c) => c.id === product.categoryId)?.name ?? product.categoryId;
   }, [product, categories]);
 
   if (loading) return <DetailSkeleton />;
@@ -94,12 +94,10 @@ export function ProductDetailPage() {
   if (!product) {
     return (
       <Paper sx={{ p: 3 }}>
-        <Alert severity="warning">No product data available.</Alert>
+        <Alert severity="warning">{t("products.noData")}</Alert>
       </Paper>
     );
   }
-
-
 
   return (
     <Paper sx={{ p: 3 }}>
@@ -107,8 +105,8 @@ export function ProductDetailPage() {
         <Box>
           <Typography variant="h4">{product.name}</Typography>
           <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap", rowGap: 1 }}>
-            <Chip size="small" label={`Category: ${categoryName ?? "-"}`} />
-            {product.ean && <Chip size="small" label={`EAN: ${product.ean}`} />}
+            <Chip size="small" label={t("products.categoryChip", { name: categoryName ?? "-" })} />
+            {product.ean && <Chip size="small" label={t("products.eanChip", { ean: product.ean })} />}
           </Stack>
         </Box>
 
@@ -116,10 +114,10 @@ export function ProductDetailPage() {
 
         <Box>
           <Typography variant="subtitle1" gutterBottom>
-            Description
+            {t("products.description")}
           </Typography>
           <Typography color="text.secondary">
-            {product.description || "No description"}
+            {product.description || t("common.noDescription")}
           </Typography>
         </Box>
       </Stack>
