@@ -59,5 +59,3 @@ Leave any of these unset to use the template defaults.
 | -------------------------- | ----------------------------------------------- | ---------------- |
 | `API_THROTTLE_RATE_LIMIT`  | Default API stage request rate (req/s).         | `20`             |
 | `API_THROTTLE_BURST_LIMIT` | Default API stage burst capacity.               | `40`             |
-| `AI_THROTTLE_RATE_LIMIT`   | Request rate (req/s) for the AI endpoint.       | `1`              |
-| `AI_THROTTLE_BURST_LIMIT`  | Burst capacity for the AI endpoint.             | `2`              |
