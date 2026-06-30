@@ -2,6 +2,7 @@ import AddPhotoAlternateIcon from "@mui/icons-material/AddPhotoAlternate";
 import CloseIcon from "@mui/icons-material/Close";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import CircularProgress from "@mui/material/CircularProgress";
 import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
 import Stack from "@mui/material/Stack";
@@ -9,11 +10,13 @@ import Typography from "@mui/material/Typography";
 import { ChangeEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { config } from "../../app/config";
+import type { UploadPhase } from "../../managers/ImageManager";
 
 export interface ProductImagesSectionProps {
   images: string[];
   selectedFiles: File[];
   uploading: boolean;
+  uploadPhase?: UploadPhase | null;
   onSelectFiles: (e: ChangeEvent<HTMLInputElement>) => void;
   onUploadFiles: () => void;
   onRemoveImage: (key: string) => void;
@@ -31,6 +34,7 @@ export function ProductImagesSection({
   images,
   selectedFiles,
   uploading,
+  uploadPhase,
   onSelectFiles,
   onUploadFiles,
   onRemoveImage,
@@ -59,6 +63,17 @@ export function ProductImagesSection({
               : t("products.form.uploadSelected", { count: selectedFiles.length })}
           </Button>
         </Stack>
+
+        {uploading && (
+          <Stack direction="row" spacing={1} alignItems="center">
+            <CircularProgress size={16} />
+            <Typography variant="body2" color="text.secondary">
+              {uploadPhase === "compressing"
+                ? t("products.form.compressing")
+                : t("products.form.uploadingImages")}
+            </Typography>
+          </Stack>
+        )}
 
         {images.length > 0 ? (
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">

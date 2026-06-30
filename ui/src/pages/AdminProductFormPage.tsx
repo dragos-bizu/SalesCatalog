@@ -15,7 +15,7 @@ import { ProductFormHeader } from "../components/admin/ProductFormHeader";
 import { ProductFormSubmit } from "../components/admin/ProductFormSubmit";
 import { ProductImagesSection } from "../components/admin/ProductImagesSection";
 import { useCategoryManager } from "../managers/CategoryManager";
-import { uploadImages } from "../managers/ImageManager";
+import { type UploadPhase, uploadImages } from "../managers/ImageManager";
 import { useProductManager } from "../managers/ProductManager";
 
 const EMPTY_FORM: ProductFormState = {
@@ -64,6 +64,7 @@ export function AdminProductFormPage() {
   const [saving, setSaving] = useState(false);
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadPhase, setUploadPhase] = useState<UploadPhase | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -185,11 +186,14 @@ export function AdminProductFormPage() {
     }
 
     setUploading(true);
+    setUploadPhase("compressing");
     setError(null);
     try {
       const uploadedKeys: string[] = [];
       for (const chunk of chunks) {
-        const uploaded = await uploadImages(chunk);
+        const uploaded = await uploadImages(chunk, {
+          onPhase: setUploadPhase,
+        });
         uploadedKeys.push(...uploaded.map((u) => u.key));
       }
       setForm((prev) => ({
@@ -202,6 +206,7 @@ export function AdminProductFormPage() {
       setError(e instanceof Error ? e.message : t("errors.uploadImages"));
     } finally {
       setUploading(false);
+      setUploadPhase(null);
     }
   }
 
@@ -235,6 +240,7 @@ export function AdminProductFormPage() {
           images={form.images}
           selectedFiles={selectedFiles}
           uploading={uploading}
+          uploadPhase={uploadPhase}
           onSelectFiles={onSelectFiles}
           onUploadFiles={onUploadFiles}
           onRemoveImage={(key) =>

@@ -7,6 +7,7 @@
 // caller can store them on a product.
 
 import { api } from "../services/api";
+import { compressImages } from "../services/imageCompression";
 import type { ImageUpload } from "../domain/types";
 
 export interface UploadedImage {
@@ -16,21 +17,38 @@ export interface UploadedImage {
   publicUrl: string;
 }
 
+/** Phase of the upload pipeline, for UI progress indicators. */
+export type UploadPhase = "compressing" | "uploading";
+
+export interface UploadImagesOptions {
+  /** Called as the pipeline moves through compression then upload. */
+  onPhase?: (phase: UploadPhase) => void;
+}
+
 /** Upload one or more image files via presigned PUT URLs. */
-export async function uploadImages(files: File[]): Promise<UploadedImage[]> {
+export async function uploadImages(
+  files: File[],
+  options: UploadImagesOptions = {},
+): Promise<UploadedImage[]> {
   if (files.length === 0) return [];
 
-  // 1. Request presigned URLs.
-  const contentTypes = files.map((f) => f.type);
+  // 0. Compress large phone photos in the browser before uploading. This is
+  // best-effort: unsupported environments return the original file.
+  options.onPhase?.("compressing");
+  const prepared = await compressImages(files);
+
+  // 1. Request presigned URLs (content types reflect the compressed output).
+  const contentTypes = prepared.map((f) => f.type);
   const { uploads } = await api.createImageUploadUrls(contentTypes);
 
-  if (uploads.length !== files.length) {
+  if (uploads.length !== prepared.length) {
     throw new Error("Mismatched number of upload URLs returned");
   }
 
   // 2. PUT each file directly to S3 (in parallel).
+  options.onPhase?.("uploading");
   await Promise.all(
-    files.map((file, i) => putToS3(file, uploads[i])),
+    prepared.map((file, i) => putToS3(file, uploads[i])),
   );
 
   return uploads.map((u) => ({ key: u.key, publicUrl: u.publicUrl }));

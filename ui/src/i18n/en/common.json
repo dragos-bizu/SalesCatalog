@@ -77,6 +77,8 @@
       "selectFiles": "Select files",
       "uploadSelected": "Upload selected ({{count}})",
       "uploading": "Uploading…",
+      "compressing": "Optimizing images…",
+      "uploadingImages": "Uploading images…",
       "noImages": "No images uploaded yet.",
       "imagesUploaded": "Images uploaded",
       "saving": "Saving…",
