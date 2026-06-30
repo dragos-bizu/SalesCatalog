@@ -77,6 +77,8 @@
       "selectFiles": "Selectare imagine",
       "uploadSelected": "Incarca imaginile ({{count}})",
       "uploading": "Incarcare...",
+      "compressing": "Se optimizeaza imaginile...",
+      "uploadingImages": "Se incarca imaginile...",
       "noImages": "Nu au fost incarcate imagini.",
       "imagesUploaded": "Imagini incarcate",
       "saving": "Salvare...",
