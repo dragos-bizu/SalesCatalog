@@ -96,29 +96,40 @@ export function ProductImageCarousel({ productName, images }: ProductImageCarous
 
   return (
     <Box sx={{ border: 1, borderColor: "divider", borderRadius: 1, overflow: "hidden" }}>
-      <Fade in key={activeImage} timeout={220}>
-        <Box
-          component="img"
-          src={activeImage}
-          alt={t("products.imageAlt", { name: productName, index: activeImageIndex + 1 })}
-          onTouchStart={(e: TouchEvent<HTMLImageElement>) =>
-            onTouchStart(e.changedTouches[0].clientX)
-          }
-          onTouchMove={(e: TouchEvent<HTMLImageElement>) =>
-            onTouchMove(e.changedTouches[0].clientX)
-          }
-          onTouchEnd={onTouchEnd}
-          sx={{
-            width: "100%",
-            maxHeight: 420,
-            objectFit: "cover",
-            display: "block",
-            touchAction: "pan-y",
-            userSelect: "none",
-            willChange: "opacity, transform",
-          }}
-        />
-      </Fade>
+      <Box
+        onTouchStart={(e: TouchEvent<HTMLDivElement>) =>
+          onTouchStart(e.changedTouches[0].clientX)
+        }
+        onTouchMove={(e: TouchEvent<HTMLDivElement>) =>
+          onTouchMove(e.changedTouches[0].clientX)
+        }
+        onTouchEnd={onTouchEnd}
+        sx={{
+          width: "100%",
+          height: { xs: 280, sm: 360, md: 420 },
+          bgcolor: "common.white",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          touchAction: "pan-y",
+        }}
+      >
+        <Fade in key={activeImage} timeout={220}>
+          <Box
+            component="img"
+            src={activeImage}
+            alt={t("products.imageAlt", { name: productName, index: activeImageIndex + 1 })}
+            sx={{
+              maxWidth: "100%",
+              maxHeight: "100%",
+              objectFit: "contain",
+              display: "block",
+              userSelect: "none",
+              willChange: "opacity",
+            }}
+          />
+        </Fade>
+      </Box>
 
       {imageUrls.length > 1 && (
         <MobileStepper
