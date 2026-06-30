@@ -61,7 +61,31 @@ jobs:
 
       - name: SAM deploy
         working-directory: infra
+        env:
+          # Optional throttling overrides. Leave the repository variables unset
+          # to fall back to the template defaults.
+          API_THROTTLE_RATE_LIMIT: ${{ vars.API_THROTTLE_RATE_LIMIT }}
+          API_THROTTLE_BURST_LIMIT: ${{ vars.API_THROTTLE_BURST_LIMIT }}
+          AI_THROTTLE_RATE_LIMIT: ${{ vars.AI_THROTTLE_RATE_LIMIT }}
+          AI_THROTTLE_BURST_LIMIT: ${{ vars.AI_THROTTLE_BURST_LIMIT }}
         run: |
+          # Base parameter overrides (always applied).
+          PARAMS=(
+            "Environment=${{ vars.ENVIRONMENT }}"
+            "DomainName=${{ secrets.DOMAIN_NAME }}"
+            "HostedZoneId=${{ secrets.HOSTED_ZONE_ID }}"
+            "GoogleClientId=${{ secrets.GOOGLE_CLIENT_ID }}"
+            "GoogleClientSecret=${{ secrets.GOOGLE_CLIENT_SECRET }}"
+            "BudgetNotificationEmail=${{ secrets.BUDGET_NOTIFICATION_EMAIL }}"
+          )
+
+          # Append throttling overrides only when the variable is provided,
+          # so unset variables cleanly use the template defaults.
+          [ -n "$API_THROTTLE_RATE_LIMIT" ]  && PARAMS+=("ApiThrottleRateLimit=$API_THROTTLE_RATE_LIMIT")
+          [ -n "$API_THROTTLE_BURST_LIMIT" ] && PARAMS+=("ApiThrottleBurstLimit=$API_THROTTLE_BURST_LIMIT")
+          [ -n "$AI_THROTTLE_RATE_LIMIT" ]   && PARAMS+=("AiThrottleRateLimit=$AI_THROTTLE_RATE_LIMIT")
+          [ -n "$AI_THROTTLE_BURST_LIMIT" ]  && PARAMS+=("AiThrottleBurstLimit=$AI_THROTTLE_BURST_LIMIT")
+
           sam deploy \
             --stack-name "${{ vars.STACK_NAME }}" \
             --region "${{ vars.AWS_REGION }}" \
@@ -69,13 +93,7 @@ jobs:
             --no-fail-on-empty-changeset \
             --resolve-s3 \
             --capabilities CAPABILITY_IAM \
-            --parameter-overrides \
-              Environment="${{ vars.ENVIRONMENT }}" \
-              DomainName="${{ secrets.DOMAIN_NAME }}" \
-              HostedZoneId="${{ secrets.HOSTED_ZONE_ID }}" \
-              GoogleClientId="${{ secrets.GOOGLE_CLIENT_ID }}" \
-              GoogleClientSecret="${{ secrets.GOOGLE_CLIENT_SECRET }}" \
-              BudgetNotificationEmail="${{ secrets.BUDGET_NOTIFICATION_EMAIL }}"
+            --parameter-overrides "${PARAMS[@]}"
 
       - name: Read stack outputs
         id: outputs

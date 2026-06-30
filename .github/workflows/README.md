@@ -50,3 +50,14 @@ Configure under **Settings → Secrets and variables → Actions**.
 | `AWS_REGION`  | Deployment region (`us-east-1`).   |
 | `ENVIRONMENT` | Environment tag (`dev`, `prod`).   |
 | `STACK_NAME`  | App stack name (`SalesCatalog`).   |
+
+**Optional variables (API Gateway throttling):**
+
+Leave any of these unset to use the template defaults.
+
+| Name                       | Purpose                                         | Template default |
+| -------------------------- | ----------------------------------------------- | ---------------- |
+| `API_THROTTLE_RATE_LIMIT`  | Default API stage request rate (req/s).         | `20`             |
+| `API_THROTTLE_BURST_LIMIT` | Default API stage burst capacity.               | `40`             |
+| `AI_THROTTLE_RATE_LIMIT`   | Request rate (req/s) for the AI endpoint.       | `1`              |
+| `AI_THROTTLE_BURST_LIMIT`  | Burst capacity for the AI endpoint.             | `2`              |
