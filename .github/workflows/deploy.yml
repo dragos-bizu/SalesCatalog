@@ -66,8 +66,6 @@ jobs:
           # to fall back to the template defaults.
           API_THROTTLE_RATE_LIMIT: ${{ vars.API_THROTTLE_RATE_LIMIT }}
           API_THROTTLE_BURST_LIMIT: ${{ vars.API_THROTTLE_BURST_LIMIT }}
-          AI_THROTTLE_RATE_LIMIT: ${{ vars.AI_THROTTLE_RATE_LIMIT }}
-          AI_THROTTLE_BURST_LIMIT: ${{ vars.AI_THROTTLE_BURST_LIMIT }}
         run: |
           # Base parameter overrides (always applied).
           PARAMS=(
@@ -83,8 +81,6 @@ jobs:
           # so unset variables cleanly use the template defaults.
           [ -n "$API_THROTTLE_RATE_LIMIT" ]  && PARAMS+=("ApiThrottleRateLimit=$API_THROTTLE_RATE_LIMIT")
           [ -n "$API_THROTTLE_BURST_LIMIT" ] && PARAMS+=("ApiThrottleBurstLimit=$API_THROTTLE_BURST_LIMIT")
-          [ -n "$AI_THROTTLE_RATE_LIMIT" ]   && PARAMS+=("AiThrottleRateLimit=$AI_THROTTLE_RATE_LIMIT")
-          [ -n "$AI_THROTTLE_BURST_LIMIT" ]  && PARAMS+=("AiThrottleBurstLimit=$AI_THROTTLE_BURST_LIMIT")
 
           sam deploy \
             --stack-name "${{ vars.STACK_NAME }}" \

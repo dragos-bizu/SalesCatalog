@@ -31,9 +31,9 @@ The template provisions, in `us-east-1`:
   - `A` (alias) records for the UI domain and the images subdomain in the provided hosted zone.
 - **API Gateway (HTTP API)**
   - Public routes: `GET /products`, `GET /products/{id}`, `GET /categories`.
-  - Admin routes (Cognito JWT authorizer): all `POST`, `PUT`, `DELETE`, `POST /admin/images/upload-url`, and `POST /admin/products/description-suggest`.
+  - Admin routes (Cognito JWT authorizer): all `POST`, `PUT`, `DELETE`, and `POST /admin/images/upload-url`.
   - Lambda-level admin authorization: user must belong to Cognito group `admins` (configurable via `AdminGroupName`).
-  - Stage-level request throttling (rate + burst), with stricter per-route limits on the AI description endpoint.
+  - Stage-level request throttling (rate + burst).
 - **Lambda functions** — one per use case under `src/lambdas/`, each with its own minimal IAM role.
 - **Lambda Layer** — packages `src/shared/` and is attached to the Lambdas that need it.
 
@@ -47,11 +47,8 @@ The template provisions, in `us-east-1`:
 | `GoogleClientSecret` | Google OAuth 2.0 Client Secret (`NoEcho`).                   |
 | `Environment`        | Environment tag (e.g. `dev`, `prod`).                        |
 | `AdminGroupName`     | Cognito group required for admin Lambda authorization.       |
-| `AiDescriptionModelId` | Bedrock model id for AI description suggestion endpoint.    |
 | `ApiThrottleRateLimit` | Default API stage request rate (req/s).                    |
 | `ApiThrottleBurstLimit` | Default API stage burst capacity.                         |
-| `AiThrottleRateLimit` | Request rate (req/s) for the AI description endpoint.       |
-| `AiThrottleBurstLimit` | Burst capacity for the AI description endpoint.            |
 
 ## Common commands
 
