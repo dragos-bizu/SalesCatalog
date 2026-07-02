@@ -90,6 +90,7 @@ The app reads its runtime configuration from Vite environment variables (prefixe
 | `VITE_COGNITO_CLIENT_ID`      | Cognito User Pool Client ID.                            |
 | `VITE_COGNITO_REDIRECT_URI`   | Redirect URI registered in the Cognito app client.      |
 | `VITE_COGNITO_LOGOUT_URI`     | Logout redirect URI.                                    |
+| `VITE_PHONE_NUMBER`           | Phone Number to be Shown in App Bar.                    |
 
 The actual values come from the SAM stack outputs after deployment.
 

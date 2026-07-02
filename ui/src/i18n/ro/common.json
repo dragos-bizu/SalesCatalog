@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "Catalog Royal",
-    "footer": "Catalog Royal"
+    "footer": "Catalog Royal",
+    "phoneNumber": "Telefon: {{phoneNumber}}"
   },
   "nav": {
     "admin": "Admin",

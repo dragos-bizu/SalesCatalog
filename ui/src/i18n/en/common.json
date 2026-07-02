@@ -1,7 +1,8 @@
 {
   "app": {
     "name": "SalesCatalog",
-    "footer": "SalesCatalog"
+    "footer": "SalesCatalog",
+    "phoneNumber": "Phone: {{phoneNumber}}"
   },
   "nav": {
     "admin": "Admin",
