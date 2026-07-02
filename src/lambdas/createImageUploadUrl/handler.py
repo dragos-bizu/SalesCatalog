@@ -11,10 +11,14 @@ distribution at IMAGES_BASE_URL/<key>.
 Request body:
     {
       "files": [
-        { "contentType": "image/jpeg" },
-        { "contentType": "image/png" }
+        { "contentType": "image/jpeg", "size": 123456 },
+        { "contentType": "image/png",  "size": 45678 }
       ]
     }
+
+The declared size is validated against MAX_FILE_BYTES and then included in
+the presigned signature (ContentLength), so S3 itself rejects any upload
+whose actual Content-Length differs from what was authorized.
 
 Response (200):
     {
@@ -45,6 +49,9 @@ logger = Logger()
 URL_EXPIRY_SECONDS = 300
 # Maximum number of upload URLs that may be requested in one call.
 MAX_FILES = 5
+# Maximum size (bytes) of a single uploaded image. Enforced by S3 via the
+# signed ContentLength header on the presigned URL.
+MAX_FILE_BYTES = 5 * 1024 * 1024  # 5 MB
 # Key prefix for product images in the bucket.
 KEY_PREFIX = "products"
 
@@ -97,7 +104,7 @@ def lambda_handler(event, context):
         return http.error(400, f"At most {MAX_FILES} files may be requested at once")
 
     # Validate every file up front so we don't issue a partial batch.
-    content_types: list[str] = []
+    validated: list[tuple[str, int]] = []
     for entry in files:
         if not isinstance(entry, dict):
             return http.error(400, "Each file entry must be an object")
@@ -108,14 +115,24 @@ def lambda_handler(event, context):
                 "Unsupported contentType; allowed: "
                 + ", ".join(sorted(_CONTENT_TYPE_EXT)),
             )
-        content_types.append(content_type)
+
+        size = entry.get("size")
+        if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
+            return http.error(400, "Field 'size' must be a positive integer")
+        if size > MAX_FILE_BYTES:
+            return http.error(
+                400,
+                f"File too large; maximum allowed size is {MAX_FILE_BYTES} bytes",
+            )
+
+        validated.append((content_type, size))
 
     client = _s3_client()
     bucket = _bucket()
     base_url = _images_base_url()
 
     uploads = []
-    for content_type in content_types:
+    for content_type, size in validated:
         ext = _CONTENT_TYPE_EXT[content_type]
         key = f"{KEY_PREFIX}/{uuid.uuid4()}.{ext}"
         upload_url = client.generate_presigned_url(
@@ -124,6 +141,9 @@ def lambda_handler(event, context):
                 "Bucket": bucket,
                 "Key": key,
                 "ContentType": content_type,
+                # Signed: the client must upload exactly this many bytes or
+                # S3 rejects the request (signature mismatch).
+                "ContentLength": size,
             },
             ExpiresIn=URL_EXPIRY_SECONDS,
         )

@@ -91,15 +91,21 @@ describe("api service", () => {
     await expect(api.deleteProduct("p1")).resolves.toBeUndefined();
   });
 
-  it("maps image content types into files payload", async () => {
+  it("sends content type and size in files payload", async () => {
     const fetchMock = mockFetch(200, { uploads: [] });
     global.fetch = fetchMock as unknown as typeof fetch;
     setTokenProvider(() => "tok");
 
-    await api.createImageUploadUrls(["image/jpeg", "image/png"]);
+    await api.createImageUploadUrls([
+      { contentType: "image/jpeg", size: 1024 },
+      { contentType: "image/png", size: 2048 },
+    ]);
     const init = fetchMock.mock.calls[0][1];
     expect(JSON.parse(init.body)).toEqual({
-      files: [{ contentType: "image/jpeg" }, { contentType: "image/png" }],
+      files: [
+        { contentType: "image/jpeg", size: 1024 },
+        { contentType: "image/png", size: 2048 },
+      ],
     });
   });
 });

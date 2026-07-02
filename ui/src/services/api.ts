@@ -144,11 +144,11 @@ export const api = {
   // --- Images -------------------------------------------------------------
 
   createImageUploadUrls(
-    contentTypes: string[],
+    files: { contentType: string; size: number }[],
   ): Promise<{ uploads: ImageUpload[] }> {
     return request<{ uploads: ImageUpload[] }>("/admin/images/upload-url", {
       method: "POST",
-      body: { files: contentTypes.map((contentType) => ({ contentType })) },
+      body: { files },
       auth: true,
     });
   },

@@ -26,6 +26,11 @@ DEFAULT_PAGE_SIZE = 20
 # Hard upper bound so a caller cannot request an unbounded page.
 MAX_PAGE_SIZE = 100
 
+# Attribute names a pagination cursor may legitimately contain. Cursors are
+# client-supplied, so anything outside this allowlist is rejected instead of
+# being forwarded to DynamoDB as an ExclusiveStartKey.
+_ALLOWED_CURSOR_KEYS = frozenset({"id", "categoryId", "createdAt"})
+
 
 @lru_cache(maxsize=1)
 def _resource():
@@ -103,6 +108,13 @@ def decode_cursor(cursor: str | None) -> dict | None:
         key = json.loads(raw.decode("utf-8"))
     except (ValueError, json.JSONDecodeError) as exc:
         raise ValueError("Invalid pagination cursor") from exc
-    if not isinstance(key, dict):
+    if not isinstance(key, dict) or not key:
         raise ValueError("Invalid pagination cursor")
+    # Strict shape validation: only known key attributes with non-empty
+    # string values are accepted. Anything else is a crafted/corrupt cursor.
+    for attr, value in key.items():
+        if attr not in _ALLOWED_CURSOR_KEYS:
+            raise ValueError("Invalid pagination cursor")
+        if not isinstance(value, str) or not value:
+            raise ValueError("Invalid pagination cursor")
     return key

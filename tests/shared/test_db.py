@@ -71,6 +71,40 @@ def test_decode_cursor_rejects_non_object(db):
         db.decode_cursor(token)
 
 
+def _token(db, payload):
+    import base64
+    import json
+
+    return base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
+
+
+def test_decode_cursor_rejects_unknown_attributes(db):
+    with pytest.raises(ValueError):
+        db.decode_cursor(_token(db, {"id": "p1", "evil": "x"}))
+
+
+def test_decode_cursor_rejects_non_string_values(db):
+    with pytest.raises(ValueError):
+        db.decode_cursor(_token(db, {"id": 123}))
+    with pytest.raises(ValueError):
+        db.decode_cursor(_token(db, {"id": {"S": "p1"}}))
+
+
+def test_decode_cursor_rejects_empty_values(db):
+    with pytest.raises(ValueError):
+        db.decode_cursor(_token(db, {"id": ""}))
+
+
+def test_decode_cursor_rejects_empty_object(db):
+    with pytest.raises(ValueError):
+        db.decode_cursor(_token(db, {}))
+
+
+def test_decode_cursor_accepts_gsi_key_shape(db):
+    key = {"id": "p1", "categoryId": "c1", "createdAt": "2024-01-01T00:00:00Z"}
+    assert db.decode_cursor(_token(db, key)) == key
+
+
 # --- table name resolution -------------------------------------------------
 
 def test_table_name_raises_when_missing(db, monkeypatch):

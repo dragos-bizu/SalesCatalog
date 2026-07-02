@@ -129,6 +129,28 @@ def test_invalid_cursor_returns_400(products_table):
     assert res["statusCode"] == 400
 
 
+def test_crafted_cursor_with_unknown_attrs_returns_400(products_table):
+    import base64
+    import json
+
+    handler = _load_handler()
+    crafted = base64.urlsafe_b64encode(
+        json.dumps({"id": "p1", "injected": "x"}).encode()
+    ).decode()
+    res = _invoke(handler, cursor=crafted)
+    assert res["statusCode"] == 400
+
+
+def test_crafted_cursor_with_non_string_value_returns_400(products_table):
+    import base64
+    import json
+
+    handler = _load_handler()
+    crafted = base64.urlsafe_b64encode(json.dumps({"id": 42}).encode()).decode()
+    res = _invoke(handler, cursor=crafted)
+    assert res["statusCode"] == 400
+
+
 def test_pagination_returns_cursor(products_table):
     handler = _load_handler()
     import json

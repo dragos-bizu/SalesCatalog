@@ -4,8 +4,10 @@ import { api } from "../services/api";
 jest.mock("../services/api");
 const mockApi = api as jest.Mocked<typeof api>;
 
-function fakeFile(name: string, type: string): File {
-  return new File(["x"], name, { type });
+function fakeFile(name: string, type: string, size = 1): File {
+  const file = new File(["x"], name, { type });
+  Object.defineProperty(file, "size", { value: size });
+  return file;
 }
 
 describe("uploadImages", () => {
@@ -48,8 +50,8 @@ describe("uploadImages", () => {
     ]);
 
     expect(mockApi.createImageUploadUrls).toHaveBeenCalledWith([
-      "image/jpeg",
-      "image/png",
+      { contentType: "image/jpeg", size: 1 },
+      { contentType: "image/png", size: 1 },
     ]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
 
@@ -62,6 +64,12 @@ describe("uploadImages", () => {
       { key: "products/a.jpg", publicUrl: "https://cdn/products/a.jpg" },
       { key: "products/b.png", publicUrl: "https://cdn/products/b.png" },
     ]);
+  });
+
+  it("rejects files above the upload size limit", async () => {
+    const big = fakeFile("huge.jpg", "image/jpeg", 6 * 1024 * 1024);
+    await expect(uploadImages([big])).rejects.toThrow(/exceeds the 5 MB upload limit/);
+    expect(mockApi.createImageUploadUrls).not.toHaveBeenCalled();
   });
 
   it("throws when a PUT fails", async () => {

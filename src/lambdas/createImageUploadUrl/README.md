@@ -17,8 +17,8 @@ Authorized by the `CognitoJwtAuthorizer`.
 ```json
 {
   "files": [
-    { "contentType": "image/jpeg" },
-    { "contentType": "image/png" }
+    { "contentType": "image/jpeg", "size": 123456 },
+    { "contentType": "image/png", "size": 45678 }
   ]
 }
 ```
@@ -27,6 +27,7 @@ Authorized by the `CognitoJwtAuthorizer`.
 | ---------------- | -------- | -------------------------------------------------- |
 | `files`          | yes      | Non-empty list, **max 5** entries.                 |
 | `files[].contentType` | yes | One of: `image/jpeg`, `image/png`, `image/webp`, `image/gif`. |
+| `files[].size`   | yes      | Positive integer, exact file size in bytes, **max 5 MB** (5242880). |
 
 The batch is validated up front: if **any** entry is invalid, the whole
 request is rejected and no URLs are issued.
@@ -49,7 +50,9 @@ request is rejected and no URLs are issued.
 ```
 
 - `uploadUrl` — presigned `PUT` URL, valid for **300 seconds**. The browser must
-  send a matching `Content-Type` header when uploading.
+  send a matching `Content-Type` header when uploading, and the uploaded body
+  must be **exactly** `size` bytes — both are part of the signature, so S3
+  rejects any mismatch. This prevents oversized uploads even with a valid URL.
 - `key` — the S3 object key; store this in the product's `images` array.
 - `publicUrl` — the CDN URL where the image will be readable after upload.
 
@@ -64,7 +67,7 @@ request is rejected and no URLs are issued.
 
 | Status | When                                                       |
 | ------ | ---------------------------------------------------------- |
-| 400    | Invalid JSON, empty/missing `files`, more than 5 files, a non-object entry, or an unsupported `contentType` |
+| 400    | Invalid JSON, empty/missing `files`, more than 5 files, a non-object entry, an unsupported `contentType`, or a missing/invalid/oversized `size` |
 | 401    | Missing/invalid JWT (enforced by API Gateway)              |
 
 ## Environment
