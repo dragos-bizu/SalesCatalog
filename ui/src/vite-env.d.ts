@@ -7,6 +7,7 @@ interface ImportMetaEnv {
   readonly VITE_COGNITO_CLIENT_ID: string;
   readonly VITE_COGNITO_REDIRECT_URI: string;
   readonly VITE_COGNITO_LOGOUT_URI: string;
+  readonly VITE_PHONE_NUMBER: string | undefined;
 }
 
 interface ImportMeta {

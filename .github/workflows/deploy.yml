@@ -165,6 +165,7 @@ jobs:
           VITE_COGNITO_REDIRECT_URI: https://${{ secrets.DOMAIN_NAME }}/auth/callback
           VITE_COGNITO_LOGOUT_URI: https://${{ secrets.DOMAIN_NAME }}/
           VITE_ADMIN_GROUP: ${{ needs.deploy-backend.outputs.admin_group_name }}
+          VITE_PHONE_NUMBER: ${{ secrets.PHONE_NUMBER }}
         run: npm run build
 
       - name: Sync to S3
