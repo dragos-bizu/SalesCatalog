@@ -17,6 +17,9 @@ export interface UploadedImage {
   publicUrl: string;
 }
 
+/** Maximum accepted size (bytes) per image; must match the backend limit. */
+export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5 MB
+
 /** Phase of the upload pipeline, for UI progress indicators. */
 export type UploadPhase = "compressing" | "uploading";
 
@@ -37,9 +40,19 @@ export async function uploadImages(
   options.onPhase?.("compressing");
   const prepared = await compressImages(files);
 
-  // 1. Request presigned URLs (content types reflect the compressed output).
-  const contentTypes = prepared.map((f) => f.type);
-  const { uploads } = await api.createImageUploadUrls(contentTypes);
+  // Reject files still above the backend limit after compression, before
+  // spending a network round-trip.
+  const tooBig = prepared.find((f) => f.size > MAX_UPLOAD_BYTES);
+  if (tooBig) {
+    const mb = (MAX_UPLOAD_BYTES / (1024 * 1024)).toFixed(0);
+    throw new Error(`Image '${tooBig.name}' exceeds the ${mb} MB upload limit`);
+  }
+
+  // 1. Request presigned URLs (content type + exact size are signed by the
+  // backend, so S3 enforces what was authorized).
+  const { uploads } = await api.createImageUploadUrls(
+    prepared.map((f) => ({ contentType: f.type, size: f.size })),
+  );
 
   if (uploads.length !== prepared.length) {
     throw new Error("Mismatched number of upload URLs returned");

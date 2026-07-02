@@ -44,7 +44,7 @@ def _invoke(handler, body):
 
 def test_single_upload_url(s3_bucket):
     handler = _load_handler()
-    res = _invoke(handler, {"files": [{"contentType": "image/jpeg"}]})
+    res = _invoke(handler, {"files": [{"contentType": "image/jpeg", "size": 1024}]})
     assert res["statusCode"] == 200
     body = json.loads(res["body"])
     assert len(body["uploads"]) == 1
@@ -59,9 +59,9 @@ def test_single_upload_url(s3_bucket):
 def test_multiple_upload_urls_unique_keys(s3_bucket):
     handler = _load_handler()
     res = _invoke(handler, {"files": [
-        {"contentType": "image/jpeg"},
-        {"contentType": "image/png"},
-        {"contentType": "image/webp"},
+        {"contentType": "image/jpeg", "size": 1024},
+        {"contentType": "image/png", "size": 2048},
+        {"contentType": "image/webp", "size": 4096},
     ]})
     body = json.loads(res["body"])
     uploads = body["uploads"]
@@ -74,7 +74,7 @@ def test_multiple_upload_urls_unique_keys(s3_bucket):
 
 def test_rejects_unsupported_content_type(s3_bucket):
     handler = _load_handler()
-    res = _invoke(handler, {"files": [{"contentType": "application/pdf"}]})
+    res = _invoke(handler, {"files": [{"contentType": "application/pdf", "size": 1024}]})
     assert res["statusCode"] == 400
 
 
@@ -86,7 +86,7 @@ def test_rejects_empty_files(s3_bucket):
 
 def test_rejects_too_many_files(s3_bucket):
     handler = _load_handler()
-    files = [{"contentType": "image/jpeg"} for _ in range(6)]
+    files = [{"contentType": "image/jpeg", "size": 1024} for _ in range(6)]
     res = _invoke(handler, {"files": files})
     assert res["statusCode"] == 400
 
@@ -107,7 +107,33 @@ def test_partial_batch_not_issued_on_invalid(s3_bucket):
     handler = _load_handler()
     # One valid, one invalid -> whole request rejected.
     res = _invoke(handler, {"files": [
-        {"contentType": "image/jpeg"},
-        {"contentType": "text/plain"},
+        {"contentType": "image/jpeg", "size": 1024},
+        {"contentType": "text/plain", "size": 1024},
     ]})
     assert res["statusCode"] == 400
+
+
+def test_rejects_missing_size(s3_bucket):
+    handler = _load_handler()
+    res = _invoke(handler, {"files": [{"contentType": "image/jpeg"}]})
+    assert res["statusCode"] == 400
+
+
+def test_rejects_non_integer_size(s3_bucket):
+    handler = _load_handler()
+    for bad in ("1024", 3.5, True, None, -1, 0):
+        res = _invoke(handler, {"files": [{"contentType": "image/jpeg", "size": bad}]})
+        assert res["statusCode"] == 400, f"size={bad!r} should be rejected"
+
+
+def test_rejects_oversized_file(s3_bucket):
+    handler = _load_handler()
+    too_big = 5 * 1024 * 1024 + 1
+    res = _invoke(handler, {"files": [{"contentType": "image/jpeg", "size": too_big}]})
+    assert res["statusCode"] == 400
+
+
+def test_accepts_exactly_max_size(s3_bucket):
+    handler = _load_handler()
+    res = _invoke(handler, {"files": [{"contentType": "image/jpeg", "size": 5 * 1024 * 1024}]})
+    assert res["statusCode"] == 200
